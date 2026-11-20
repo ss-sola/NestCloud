@@ -702,7 +702,8 @@ body:has(.control-plane-dialog[open]) .loading-overlay {
   font-weight: 600;
 }
 
-.registry-badge.muted {
+.registry-badge.muted,
+.registry-badge.health-unavailable {
   background: #f3f5f7;
   color: #738195;
 }
@@ -752,17 +753,22 @@ body:has(.control-plane-dialog[open]) .loading-overlay {
   font-weight: 600;
 }
 
-.registry-audit-type.register {
+.registry-badge.health-healthy,
+.registry-audit-type.register,
+.registry-audit-type.enable {
   background: #e7f8ee;
   color: #0d7a43;
 }
 
+.registry-badge.health-critical,
 .registry-audit-type.unregister,
+.registry-audit-type.disable,
 .registry-audit-type.expire {
   background: #ffe7e7;
   color: #b42318;
 }
 
+.registry-badge.health-warning,
 .registry-audit-type.heartbeat-miss,
 .registry-audit-type.discover-miss {
   background: #fff3de;

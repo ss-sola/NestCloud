@@ -44,6 +44,12 @@ export class RegistryService implements OnModuleDestroy {
     return this.store.unregister(id);
   }
 
+  async setAvailability(id: string, enabled: boolean) {
+    if (!(await this.store.setAvailability(id, enabled))) {
+      throw new ProjectException('实例已不存在，请刷新后重试', 404);
+    }
+  }
+
   // 心跳续约
   heartbeat(id: string) {
     return this.store.heartbeat(id);

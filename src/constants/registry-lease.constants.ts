@@ -1,6 +1,7 @@
-/** 只比较并更新实例哈希，兼容 Redis Cluster 中分属不同槽的原有键。 */
-export const RENEW_REGISTRY_LEASE = `
-  if redis.call('HGET', KEYS[1], ARGV[1]) ~= ARGV[2] then return 0 end
+/** 比对并写入同一实例哈希。空快照表示仅在实例不存在时写入。 */
+export const WRITE_REGISTRY_LEASE = `
+  local current = redis.call('HGET', KEYS[1], ARGV[1])
+  if (current or '') ~= ARGV[2] then return 0 end
   redis.call('HSET', KEYS[1], ARGV[1], ARGV[3])
   return 1
 `;

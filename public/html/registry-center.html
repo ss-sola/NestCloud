@@ -35,9 +35,9 @@
       <span class="registry-overview-sub">主动下线 + 超时摘除</span>
     </div>
     <div class="registry-overview-card">
-      <span class="overview-label">心跳成功/失败</span>
-      <strong id="heartbeatMetricCount">0 / 0</strong>
-      <span class="registry-overview-sub">用于观察实例续约质量</span>
+      <span class="overview-label">心跳正常 / 超时</span>
+      <strong id="heartbeatInstanceCount">0 / 0</strong>
+      <span class="registry-overview-sub">当前登记的实例数</span>
     </div>
     <div class="registry-overview-card">
       <span class="overview-label">发现成功/失败</span>
@@ -64,6 +64,7 @@
           <tr>
             <th>服务名</th>
             <th>在线实例</th>
+            <th>健康状态</th>
             <th>分组</th>
             <th>最近心跳</th>
             <th>操作</th>
@@ -103,6 +104,7 @@
                 <th>地址</th>
                 <th>分组</th>
                 <th>最近心跳</th>
+                <th>健康状态</th>
                 <th>元数据</th>
                 <th>操作</th>
               </tr>
