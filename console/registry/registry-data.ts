@@ -1,4 +1,5 @@
 import { checkRes, hideLoading, showAlert, showLoading } from '../utils.js';
+import { fetchControlPlane } from '../control-plane-auth.js';
 import { renderRegistryDashboard } from './registry-ui.js';
 
 interface RegistryOverview {
@@ -122,7 +123,7 @@ export function selectRegistryService(serviceName: string) {
 export async function removeRegistryInstance(instanceId: string) {
   showLoading();
   try {
-    const response = await fetch(
+    const response = await fetchControlPlane(
       `${location.origin}/api/registry/unregister/${encodeURIComponent(instanceId)}`,
       {
         method: 'POST',
@@ -137,7 +138,7 @@ export async function removeRegistryInstance(instanceId: string) {
 }
 
 async function fetchOverview() {
-  const response = await fetch(`${location.origin}/api/registry/overview`);
+  const response = await fetchControlPlane(`${location.origin}/api/registry/overview`);
   return checkRes<RegistryOverview>(response);
 }
 
@@ -151,7 +152,7 @@ async function fetchServices() {
   }
 
   const queryString = params.toString();
-  const response = await fetch(
+  const response = await fetchControlPlane(
     `${location.origin}/api/registry/services${queryString ? `?${queryString}` : ''}`,
   );
   return checkRes<RegistryService[]>(response);
@@ -160,6 +161,8 @@ async function fetchServices() {
 async function fetchAudits() {
   const params = new URLSearchParams();
   params.set('limit', String(registryQuery.auditLimit));
-  const response = await fetch(`${location.origin}/api/registry/audits?${params.toString()}`);
+  const response = await fetchControlPlane(
+    `${location.origin}/api/registry/audits?${params.toString()}`,
+  );
   return checkRes<RegistryAudit[]>(response);
 }

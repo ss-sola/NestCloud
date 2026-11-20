@@ -1,5 +1,6 @@
 import { renderTable, renderPagination } from './config-ui.js';
 import { showLoading, hideLoading, checkRes } from '../utils.js';
+import { fetchControlPlane } from '../control-plane-auth.js';
 
 import type {
   ConfigAggregate,
@@ -75,7 +76,7 @@ export function getConfigByName(name: string) {
 export async function loadVersionHistory(name: string) {
   const params = new URLSearchParams();
   params.set('name', name);
-  const res = await fetch(`${location.origin}/api/config-files/history?${params}`);
+  const res = await fetchControlPlane(`${location.origin}/api/config-files/history?${params}`);
   return checkRes<ConfigSnapshot[]>(res);
 }
 
@@ -93,6 +94,6 @@ async function fetchConfigPage() {
     params.set('format', queryState.format);
   }
 
-  const res = await fetch(`${location.origin}/api/config-files/page?${params}`);
+  const res = await fetchControlPlane(`${location.origin}/api/config-files/page?${params}`);
   return checkRes<ConfigPage>(res);
 }
