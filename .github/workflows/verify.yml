@@ -1,6 +1,8 @@
 name: PR verification
 
 on:
+  push:
+    branches: [feature/pr-ci-public-sdk]
   pull_request:
     branches: [dev/master, master]
     types: [opened, synchronize, reopened, edited, ready_for_review]
@@ -10,7 +12,7 @@ permissions:
 
 jobs:
   verify:
-    name: NestCloud / lint, test, types and build
+    name: ${{ github.event_name == 'pull_request' && 'NestCloud / lint, test, types and build' || 'NestCloud / branch verification' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,7 +27,6 @@ jobs:
         with:
           repository: ss-sola/NestCloud-Sdk
           ref: dev/master
-          token: ${{ secrets.NESTCLOUD_SDK_READ_TOKEN || github.token }}
           path: NestCloud-Sdk
           persist-credentials: false
 
