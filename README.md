@@ -15,7 +15,7 @@ Copy-Item .env.example .env
 
 在 PostgreSQL 中建立数据库，在 `.env` 中填写对应的连接参数和部署专用的 `SessionSecret`。首次安装时，用拥有建表权限的角色在该数据库执行 [sql/init.sql](sql/init.sql)。配置文件由控制台或 API 创建、发布。设置 `RegistryRedisUrl` 可将注册信息存放到 Redis，留空使用进程内存。
 
-启用控制面鉴权时，在 NestCloud 和接入服务的 `.env` 或进程环境中设置相同的 `ControlPlaneToken`。打开控制台后按提示输入该 Token。[部署和接入说明](docs/project/部署与可观测性.md#控制面鉴权)
+启用控制面鉴权时，在 NestCloud 和接入服务的 `.env` 或进程环境中设置相同的 `ControlPlaneToken`。控制台每个浏览器会话输入一次 Token，刷新页面可继续使用当前会话。[部署和接入说明](docs/project/部署与可观测性.md#控制面鉴权)
 
 本仓库的 `sql/sdk/` 维护 SDK 所需表的建表脚本。启用写请求幂等前，在每个接收写请求的业务数据库执行[幂等记录建表脚本](sql/sdk/add-rpc-idempotency-record.sql)。多个服务共用一个数据库和 schema 时只需执行一次，已有库可重复执行。
 
