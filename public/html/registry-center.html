@@ -1,0 +1,145 @@
+<div class="content-header">
+  <h5 class="mb-0">注册中心</h5>
+</div>
+
+<div class="content-body">
+  <div class="registry-overview-grid mb-4">
+    <div class="registry-overview-card primary">
+      <span class="overview-label">存储模式</span>
+      <strong id="registryStorageType">-</strong>
+      <span class="registry-overview-sub" id="registryLastChangeAt">最近变更：-</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">在线服务数</span>
+      <strong id="registryServiceCount">0</strong>
+      <span class="registry-overview-sub">当前唯一服务名数量</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">在线实例数</span>
+      <strong id="registryInstanceCount">0</strong>
+      <span class="registry-overview-sub" id="registryLatestHeartbeat">最近心跳：-</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">审计记录数</span>
+      <strong id="registryAuditCount">0</strong>
+      <span class="registry-overview-sub">最近保留的审计事件</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">注册次数</span>
+      <strong id="registerMetricCount">0</strong>
+      <span class="registry-overview-sub">累计实例注册或覆盖更新</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">下线/摘除次数</span>
+      <strong id="unregisterMetricCount">0</strong>
+      <span class="registry-overview-sub">主动下线 + 超时摘除</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">心跳成功/失败</span>
+      <strong id="heartbeatMetricCount">0 / 0</strong>
+      <span class="registry-overview-sub">用于观察实例续约质量</span>
+    </div>
+    <div class="registry-overview-card">
+      <span class="overview-label">发现成功/失败</span>
+      <strong id="discoverMetricCount">0 / 0</strong>
+      <span class="registry-overview-sub">未发现实例时会计入失败</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header registry-toolbar">
+      <h5 class="card-title mb-0">当前服务状态</h5>
+      <div class="registry-toolbar-group">
+        <input id="registrySearchInput" class="form-control registry-search-box" placeholder="搜索服务名" />
+        <select id="registryGroupFilter" class="form-select status-filter">
+          <option value="">全部分组</option>
+        </select>
+        <span class="registry-auto-refresh-hint" id="registryRefreshStatus">自动刷新：运行中</span>
+        <button id="registryRefreshBtn" class="btn btn-primary btn-sm">刷新</button>
+      </div>
+    </div>
+    <div class="card-body registry-table-wrap">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>服务名</th>
+            <th>在线实例</th>
+            <th>分组</th>
+            <th>最近心跳</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="registryServiceTableBody"></tbody>
+      </table>
+      <div id="registryServiceEmpty" class="registry-empty" style="display: none;">当前没有在线服务实例</div>
+    </div>
+  </div>
+
+  <div class="registry-detail-stack">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">实例明细</h5>
+      </div>
+      <div class="card-body">
+        <div class="registry-meta-block">
+          <div class="registry-meta-card">
+            <span>当前服务</span>
+            <strong id="selectedServiceName">-</strong>
+          </div>
+          <div class="registry-meta-card">
+            <span>实例数量</span>
+            <strong id="selectedServiceInstanceCount">0</strong>
+          </div>
+          <div class="registry-meta-card">
+            <span>涉及分组</span>
+            <strong id="selectedServiceGroups">-</strong>
+          </div>
+        </div>
+        <div class="registry-table-wrap">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>实例 ID</th>
+                <th>地址</th>
+                <th>分组</th>
+                <th>最近心跳</th>
+                <th>元数据</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="registryInstanceTableBody"></tbody>
+          </table>
+        </div>
+        <div id="registryInstanceEmpty" class="registry-empty" style="display: none;">选择一个服务后查看实例明细</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header registry-toolbar">
+        <h5 class="card-title mb-0">审计记录</h5>
+        <div class="registry-toolbar-group">
+          <select id="registryAuditLimit" class="form-select status-filter">
+            <option value="10">最近 10 条</option>
+            <option value="20" selected>最近 20 条</option>
+            <option value="50">最近 50 条</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body registry-table-wrap">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>事件</th>
+              <th>服务</th>
+              <th>实例</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody id="registryAuditTableBody"></tbody>
+        </table>
+        <div id="registryAuditEmpty" class="registry-empty" style="display: none;">当前没有审计记录</div>
+      </div>
+    </div>
+  </div>
+</div>

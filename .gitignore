@@ -1,0 +1,10 @@
+node_modules/
+dist/
+/public/js/
+/public/vendor/
+coverage/
+logs/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo

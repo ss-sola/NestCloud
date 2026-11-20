@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>配置与注册中心</title>
+
+    <link
+      rel="stylesheet"
+      href="./vendor/bootstrap/bootstrap.min.css"
+    />
+    <!-- 引入 Monaco Editor -->
+    <link
+      rel="stylesheet"
+      href="./vendor/monaco-editor/min/vs/editor/editor.main.css"
+    />
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="切换侧边栏">☰</button>
+        <span class="sidebar-title">配置与注册中心</span>
+      </div>
+      <div class="sidebar-menu">
+        <div class="menu-group">
+          <div class="menu-group-title">系统管理</div>
+          <div class="menu-item" id="serverMenu">
+            <i>📊</i>
+            <span>注册中心</span>
+          </div>
+          <div class="menu-item" id="configMenu">
+            <i>⚙️</i>
+            <span>配置管理</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content"></div>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+    </div>
+    <!-- 引入必要的JS库 -->
+    <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="./vendor/monaco-editor/min/vs/loader.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

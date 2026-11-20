@@ -1,0 +1,81 @@
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { getConfig, ProjectException } from '@nest-cloud/sdk';
+import { MemoryRegistryStore, RedisRegistryStore, RegistryStore } from './registry.store';
+import { RegistryRegistration, RegistryServiceQuery } from './registry.types';
+import { DEFAULT_AUDIT_LIMIT, DEFAULT_REDIS_PREFIX } from './registry.constants';
+import { ConfigServiceKeys } from '../config-keys';
+
+@Injectable()
+export class RegistryService implements OnModuleDestroy {
+  private readonly logger: Logger = new Logger(RegistryService.name);
+  private readonly store: RegistryStore;
+
+  constructor() {
+    const redisUrl = getConfig<string>(ConfigServiceKeys.RegistryRedisUrl, '', false);
+    const auditLimit = Number(
+      getConfig<string>(ConfigServiceKeys.RegistryAuditLimit, String(DEFAULT_AUDIT_LIMIT), false),
+    );
+
+    this.store = redisUrl
+      ? new RedisRegistryStore({
+          redisUrl,
+          auditLimit,
+          keyPrefix: getConfig<string>(
+            ConfigServiceKeys.RegistryRedisKeyPrefix,
+            DEFAULT_REDIS_PREFIX,
+            false,
+          ),
+        })
+      : new MemoryRegistryStore({ auditLimit });
+  }
+
+  async onModuleDestroy() {
+    await this.store.destroy();
+  }
+
+  // 服务注册
+  register(instance: RegistryRegistration) {
+    this.logger.log(`Registering instance: ${JSON.stringify(instance)}`);
+    return this.store.register(instance);
+  }
+
+  // 服务下线
+  unregister(id: string) {
+    return this.store.unregister(id);
+  }
+
+  // 心跳续约
+  heartbeat(id: string) {
+    return this.store.heartbeat(id);
+  }
+
+  // 服务发现
+  async discover(serviceName: string, group?: string) {
+    const instances = await this.store.getService(serviceName, group);
+    if (instances.length === 0) {
+      throw new ProjectException(`未发现可用的服务实例: ${serviceName}`, 404);
+    }
+    return instances;
+  }
+
+  // 清理过期实例（例如 30s 未心跳的实例）
+  cleanup(timeout = 30_000) {
+    return this.store.cleanup(timeout);
+  }
+
+  getAll() {
+    return this.store.getAll();
+  }
+
+  getOverview() {
+    return this.store.getOverview();
+  }
+
+  getServices(query: RegistryServiceQuery = {}) {
+    return this.store.getServiceSummaries(query);
+  }
+
+  getAuditLogs(limit?: number) {
+    return this.store.getAuditLogs(limit);
+  }
+}

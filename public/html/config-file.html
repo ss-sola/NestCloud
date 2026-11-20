@@ -1,0 +1,311 @@
+<div>
+  <!-- 新增/编辑配置弹窗 -->
+  <div class="modal fade" id="configModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content config-modal-shell">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">新增配置</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body">
+          <form id="configForm">
+            <div class="config-form-grid">
+              <div class="mb-3">
+                <label for="configName" class="form-label">名称</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="configName"
+                  placeholder="例如 application.yaml"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label for="configFormat" class="form-label">格式</label>
+                <select class="form-select" id="configFormat" required>
+                  <option value="yaml">YAML</option>
+                  <option value="yml">YML</option>
+                  <option value="json">JSON</option>
+                  <option value="env">ENV</option>
+                  <option value="properties">Properties</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="config-meta-row mb-3">
+              <div class="meta-chip">
+                <span class="meta-label">版本</span>
+                <strong id="configVersion">0</strong>
+              </div>
+              <div class="meta-chip">
+                <span class="meta-label">状态</span>
+                <strong id="configStatus">草稿</strong>
+              </div>
+              <div class="meta-chip meta-chip-wide">
+                <span class="meta-label">发布时间</span>
+                <strong id="configPublishedAt">未发布</strong>
+              </div>
+              <div class="meta-chip meta-chip-wide">
+                <span class="meta-label">MD5</span>
+                <strong id="configMd5">-</strong>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="configDescription" class="form-label">说明</label>
+              <textarea
+                class="form-control"
+                id="configDescription"
+                rows="2"
+                placeholder="描述这份配置的用途、影响范围和注意事项"
+              ></textarea>
+            </div>
+
+            <div class="mb-3">
+              <div class="editor-toolbar">
+                <label class="form-label mb-0">配置内容</label>
+                <div class="editor-toolbar-actions">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    id="formatJsonBtn"
+                  >
+                    格式化内容
+                  </button>
+                </div>
+              </div>
+              <div id="jsoneditor" class="json-editor-panel"></div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <div class="text-muted small me-auto" id="modalHint">
+            保存只更新草稿，发布会递增版本号并立即生效。
+          </div>
+          <button type="button" class="btn btn-outline-primary" id="saveBtn">
+            保存
+          </button>
+          <button type="button" class="btn btn-primary" id="publishBtn">
+            保存并发布
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 查看配置弹窗 -->
+  <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content config-modal-shell">
+        <div class="modal-header">
+          <h5 class="modal-title" id="viewModalTitle">查看配置</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body">
+          <div class="config-meta-row mb-3">
+            <div class="meta-chip">
+              <span class="meta-label">格式</span>
+              <strong id="viewConfigFormat">-</strong>
+            </div>
+            <div class="meta-chip">
+              <span class="meta-label">版本</span>
+              <strong id="viewConfigVersion">0</strong>
+            </div>
+            <div class="meta-chip">
+              <span class="meta-label">状态</span>
+              <strong id="viewConfigStatus">草稿</strong>
+            </div>
+            <div class="meta-chip meta-chip-wide">
+              <span class="meta-label">发布时间</span>
+              <strong id="viewConfigPublishedAt">未发布</strong>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">说明</label>
+            <div class="config-description-view" id="viewConfigDescription">-</div>
+          </div>
+          <div id="viewJsonEditor" class="json-editor-panel"></div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content config-modal-shell">
+        <div class="modal-header">
+          <h5 class="modal-title" id="historyModalTitle">版本历史</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th width="90">ID</th>
+                  <th width="110">版本</th>
+                  <th width="100">格式</th>
+                  <th width="100">状态</th>
+                  <th>说明</th>
+                  <th width="170">发布时间</th>
+                  <th width="170">更新时间</th>
+                  <th width="100">操作</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="historyEmptyState" style="display: none">
+            <p>暂无版本历史</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认弹窗 -->
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">确认删除</h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body">
+          <p>确定要删除此配置吗？删除后将无法恢复。</p>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            data-bs-dismiss="modal"
+          >
+            取消
+          </button>
+          <button type="button" class="btn btn-primary" id="confirmDeleteBtn">
+            确认删除
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="content-header">
+  <div>
+    <h5 class="mb-1">配置管理</h5>
+    <div class="text-muted small">统一维护配置内容、草稿发布和在线预览。</div>
+  </div>
+</div>
+<div class="content-body">
+  <div class="config-overview-grid mb-4">
+    <div class="overview-card">
+      <span class="overview-label">配置总数</span>
+      <strong id="totalCount">0</strong>
+    </div>
+    <div class="overview-card">
+      <span class="overview-label">已发布</span>
+      <strong id="publishedCount">0</strong>
+    </div>
+    <div class="overview-card">
+      <span class="overview-label">草稿</span>
+      <strong id="draftCount">0</strong>
+    </div>
+    <div class="overview-card overview-card-wide">
+      <span class="overview-label">当前页</span>
+      <strong id="pageSummary">第 1 页</strong>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="config-toolbar w-100">
+        <div class="config-filter-group">
+          <input
+            type="text"
+            class="form-control search-box"
+            id="searchInput"
+            placeholder="根据名称搜索..."
+          />
+          <select class="form-select status-filter" id="statusFilter">
+            <option value="">全部状态</option>
+            <option value="true">已发布</option>
+            <option value="false">草稿</option>
+          </select>
+          <select class="form-select status-filter" id="formatFilter">
+            <option value="">全部格式</option>
+            <option value="yaml">YAML</option>
+            <option value="yml">YML</option>
+            <option value="json">JSON</option>
+            <option value="env">ENV</option>
+            <option value="properties">Properties</option>
+          </select>
+          <button class="btn btn-outline-primary" id="refreshBtn">刷新</button>
+        </div>
+        <button class="btn btn-primary ms-auto" id="addBtn">
+          <i>+</i> 新增配置
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th width="120">最新发布</th>
+              <th width="120">当前草稿</th>
+              <th width="100">格式</th>
+              <th width="120">显示版本</th>
+              <th width="170">更新时间</th>
+              <th width="320">操作</th>
+            </tr>
+          </thead>
+          <tbody id="configTableBody">
+            <!-- 动态生成 -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="emptyState" style="display: none">
+        <i style="font-size: 48px; margin-bottom: 10px">📭</i>
+        <p>暂无数据</p>
+      </div>
+
+      <nav aria-label="Page navigation">
+        <ul class="pagination" id="pagination">
+          <!-- 动态生成 -->
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
