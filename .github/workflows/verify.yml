@@ -25,7 +25,6 @@ jobs:
         with:
           repository: ss-sola/NestCloud-Sdk
           ref: dev/master
-          token: ${{ secrets.NESTCLOUD_SDK_READ_TOKEN || github.token }}
           path: NestCloud-Sdk
           persist-credentials: false
 
