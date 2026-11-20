@@ -17,8 +17,6 @@ Copy-Item .env.example .env
 
 本仓库的 `sql/sdk/` 维护 SDK 所需表的建表脚本。启用写请求幂等前，在每个接收写请求的业务数据库执行[幂等记录建表脚本](sql/sdk/add-rpc-idempotency-record.sql)。多个服务共用一个数据库和 schema 时只需执行一次，已有库可重复执行。
 
-多实例共享登录会话时，在同一登录域内使用相同的 `SessionSecret`、`SessionRedisUrl` 和会话键前缀。`SessionRedisUrl` 用于会话存储，`RegistryRedisUrl` 用于注册发现，两项可独立配置。
-
 ```powershell
 pnpm start:dev
 ```
