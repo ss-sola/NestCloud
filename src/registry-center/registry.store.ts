@@ -669,7 +669,9 @@ function parseInstance(raw: string | null) {
   }
 
   try {
-    return JSON.parse(raw) as RegistryInstance;
+    const instance = JSON.parse(raw) as RegistryInstance & { heartbeatInterval?: unknown };
+    delete instance.heartbeatInterval;
+    return instance;
   } catch {
     return null;
   }

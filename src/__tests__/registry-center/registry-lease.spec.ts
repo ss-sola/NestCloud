@@ -96,6 +96,31 @@ describe('Redis registry leases', () => {
     );
   });
 
+  it('uses the server interval for a legacy lease and drops its custom interval on renewal', async () => {
+    vi.setSystemTime(92_000);
+    const historical = JSON.stringify({
+      ...lease,
+      heartbeatInterval: 120_000,
+      heartbeatSuccessStreak: 3,
+    });
+    redis.hVals.mockResolvedValue([historical]);
+    redis.hGet.mockResolvedValue(historical);
+    redis.eval.mockResolvedValueOnce(1);
+
+    const [summary] = await store.getServiceSummaries();
+    expect(summary.instances[0].health).toBe('critical');
+    expect(summary.instances[0]).not.toHaveProperty('heartbeatInterval');
+    await expect(store.heartbeat(lease.id)).resolves.toEqual({ success: true });
+    expect(redis.eval).toHaveBeenCalledExactlyOnceWith(WRITE_REGISTRY_LEASE, {
+      keys: ['test:instances'],
+      arguments: [
+        lease.id,
+        historical,
+        JSON.stringify({ ...lease, heartbeatSuccessStreak: 1, lastHeartbeat: 92_000 }),
+      ],
+    });
+  });
+
   it('counts the winning cleanup once and preserves discovery and the index when the same ID re-registers', async () => {
     let row: string | null = observed;
     const members = new Set([lease.id]);

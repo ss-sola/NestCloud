@@ -1,9 +1,8 @@
+import { HEARTBEAT_INTERVAL } from '@nest-cloud/sdk';
 import {
-  HEARTBEAT_GRACE_RATIO,
+  HEARTBEAT_GRACE_MS,
   HEARTBEAT_HEALTH_THRESHOLD,
   INSTANCE_HEALTH_SCORES,
-  LEGACY_HEARTBEAT_INTERVAL,
-  MAX_HEARTBEAT_GRACE_MS,
   SERVICE_HEALTH_SCORE_THRESHOLDS,
 } from '../registry.constants';
 import type {
@@ -49,8 +48,9 @@ export class RegistryHealthUtil {
   }
 
   private static missedHeartbeats(instance: RegistryInstance, now: number): number {
-    const interval = instance.heartbeatInterval ?? LEGACY_HEARTBEAT_INTERVAL;
-    const grace = Math.min(interval * HEARTBEAT_GRACE_RATIO, MAX_HEARTBEAT_GRACE_MS);
-    return Math.max(0, Math.floor((now - instance.lastHeartbeat - grace) / interval));
+    return Math.max(
+      0,
+      Math.floor((now - instance.lastHeartbeat - HEARTBEAT_GRACE_MS) / HEARTBEAT_INTERVAL),
+    );
   }
 }

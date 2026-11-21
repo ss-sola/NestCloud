@@ -38,12 +38,6 @@ export class RegisterInstanceForm {
   port?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  heartbeatInterval?: number;
-
-  @IsOptional()
   @IsString()
   group?: string;
 

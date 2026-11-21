@@ -9,8 +9,7 @@ export type RegistryRegistration = Omit<
 >;
 
 export interface RegistryInstance extends ServiceInstance {
-  /** 以毫秒计。旧租约可能未记录间隔和连续成功次数。 */
-  heartbeatInterval?: number;
+  /** 旧租约可能未记录连续成功次数。 */
   heartbeatSuccessStreak?: number;
   /** 控制台已暂停该实例参与服务发现，租约仍可续约。 */
   disabled?: true;

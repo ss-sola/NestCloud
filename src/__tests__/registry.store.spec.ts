@@ -55,8 +55,8 @@ it('手动摘除后继续续约和接受注册更新，恢复前始终不参与�
 
 it('按当前租约统计心跳正常和超时的实例，重复续约只计一个实例', async () => {
   vi.useFakeTimers();
-  const timeout = 60_000;
-  const store = new MemoryRegistryStore({ clearTimeout: timeout });
+  const timeout = 180_000;
+  const store = new MemoryRegistryStore();
   const instance = { id: 'one', name: 'worker', host: 'localhost', port: 3300 };
   const start = 1_000;
 
@@ -96,13 +96,12 @@ it('按当前租约统计心跳正常和超时的实例，重复续约只计一�
 it('实例健康状态反映连续心跳结果，恢复后重新累计三次成功', async () => {
   vi.useFakeTimers();
   const store = new MemoryRegistryStore();
-  const interval = 1000;
+  const interval = 30_000;
   const instance = {
     id: 'health-1',
     name: 'worker',
     host: 'localhost',
     port: 3300,
-    heartbeatInterval: interval,
   };
   const start = 10_000;
   const readHealth = async () => (await store.getServiceSummaries())[0].instances[0].health;
@@ -119,17 +118,17 @@ it('实例健康状态反映连续心跳结果，恢复后重新累计三次成�
     }
 
     const lastHeartbeat = start + 3 * interval;
-    vi.setSystemTime(lastHeartbeat + 1099);
+    vi.setSystemTime(lastHeartbeat + 30_999);
     expect(await readHealth()).toBe('healthy');
-    vi.setSystemTime(lastHeartbeat + 1100);
+    vi.setSystemTime(lastHeartbeat + 31_000);
     expect(await readHealth()).toBe('warning');
-    vi.setSystemTime(lastHeartbeat + 3099);
+    vi.setSystemTime(lastHeartbeat + 90_999);
     expect(await readHealth()).toBe('warning');
-    vi.setSystemTime(lastHeartbeat + 3100);
+    vi.setSystemTime(lastHeartbeat + 91_000);
     expect(await readHealth()).toBe('critical');
 
     for (let beat = 1; beat <= 3; beat += 1) {
-      vi.setSystemTime(lastHeartbeat + 3100 + (beat - 1) * interval);
+      vi.setSystemTime(lastHeartbeat + 91_000 + (beat - 1) * interval);
       await store.heartbeat(instance.id);
       expect(await readHealth()).toBe(beat === 3 ? 'healthy' : 'warning');
     }
@@ -145,14 +144,13 @@ it('实例健康状态反映连续心跳结果，恢复后重新累计三次成�
 it('按启用的实例计算健康均分，明细仍显示摘除实例的心跳状态', async () => {
   vi.useFakeTimers();
   const store = new MemoryRegistryStore();
-  const interval = 1000;
+  const interval = 30_000;
   const start = 10_000;
   const primary = {
     id: 'health-1',
     name: 'worker',
     host: 'localhost',
     port: 3300,
-    heartbeatInterval: interval,
   };
   const peer = { ...primary, id: 'health-2', port: 3301 };
   const readSummary = async () => (await store.getServiceSummaries())[0];
@@ -186,9 +184,9 @@ it('按启用的实例计算健康均分，明细仍显示摘除实例的心跳�
     });
     await store.setAvailability(peer.id, true);
 
-    vi.setSystemTime(start + 5 * interval + 100);
+    vi.setSystemTime(start + 5 * interval + 1000);
     expect(await readSummary()).toMatchObject({ health: 'warning', healthScore: 25 });
-    vi.setSystemTime(start + 7 * interval + 100);
+    vi.setSystemTime(start + 7 * interval + 1000);
     expect(await readSummary()).toMatchObject({ health: 'critical', healthScore: 0 });
 
     await store.setAvailability(primary.id, false);

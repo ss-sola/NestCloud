@@ -32,6 +32,30 @@ describe('注册接口地址协议', () => {
     }
   });
 
+  it('保留旧客户端的注册兼容性并丢弃上报的心跳间隔和时间', async () => {
+    const registry = new RegistryService();
+    try {
+      const controller = new RegistryController(registry);
+      await controller.register(
+        await pipe.transform(
+          {
+            ...identity,
+            host: 'localhost',
+            port: 8080,
+            heartbeatInterval: 120_000,
+            lastHeartbeat: 0,
+          },
+          body,
+        ),
+      );
+      const [instance] = await registry.discover(identity.name, identity.group);
+      expect(instance).not.toHaveProperty('heartbeatInterval');
+      expect(instance.lastHeartbeat).toBeGreaterThan(0);
+    } finally {
+      await registry.onModuleDestroy();
+    }
+  });
+
   it.each([
     {},
     { host: '10.0.0.1' },

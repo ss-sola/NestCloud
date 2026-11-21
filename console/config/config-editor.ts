@@ -24,9 +24,6 @@ export function initJsonEditors() {
   // AMD 和编辑器 Worker 共用绝对地址，以支持 /public/ 和反向代理子路径。
   const vs = new URL('../../vendor/monaco-editor/min/vs', import.meta.url).href;
   window.require.config({ paths: { vs } });
-  window.MonacoEnvironment = {
-    getWorkerUrl: () => `${vs}/base/worker/workerMain.js`,
-  };
 
   const ready = new Promise<ConfigEditors | null>((resolve) => {
     window.require(

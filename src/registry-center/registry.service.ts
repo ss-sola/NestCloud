@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { getConfig, ProjectException } from '@nest-cloud/sdk';
 import { MemoryRegistryStore, RedisRegistryStore, RegistryStore } from './registry.store';
 import { RegistryRegistration, RegistryServiceQuery } from './registry.types';
-import { DEFAULT_AUDIT_LIMIT, DEFAULT_REDIS_PREFIX } from './registry.constants';
+import { CLEAR_TIMEOUT, DEFAULT_AUDIT_LIMIT, DEFAULT_REDIS_PREFIX } from './registry.constants';
 import { ConfigServiceKeys } from '../config-keys';
 
 @Injectable()
@@ -64,8 +64,8 @@ export class RegistryService implements OnModuleDestroy {
     return instances;
   }
 
-  // 清理过期实例（例如 30s 未心跳的实例）
-  cleanup(timeout = 30_000) {
+  // 手动清理默认采用和定时清理相同的租约期限。
+  cleanup(timeout = CLEAR_TIMEOUT) {
     return this.store.cleanup(timeout);
   }
 
