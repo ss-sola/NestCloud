@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ResponseUtil } from '@nest-cloud/sdk';
 import { RegistryService } from './registry.service';
+import { InstanceAvailability, InstanceAvailabilityForm } from './form/instance-availability.form';
 import { RegisterInstanceForm } from './form/register-instance.form';
 import { RegistryRegistrationUtil } from './utils/registry-registration.util';
 
@@ -20,6 +21,12 @@ export class RegistryController {
   @Post('unregister/:id')
   async unregister(@Param('id') id: string) {
     return ResponseUtil.success(await this.registry.unregister(id));
+  }
+
+  @Post('availability')
+  async setAvailability(@Body() form: InstanceAvailabilityForm) {
+    await this.registry.setAvailability(form.id, form.state === InstanceAvailability.Enabled);
+    return ResponseUtil.success(true);
   }
 
   // 心跳

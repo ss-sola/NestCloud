@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -10,7 +10,6 @@
     "sourceMap": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    "ignoreDeprecations": "6.0",
     "incremental": false,
     "skipLibCheck": true,
     "strictNullChecks": true,

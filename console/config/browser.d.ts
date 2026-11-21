@@ -8,9 +8,6 @@ declare global {
       config(options: { paths: { vs: string } }): void;
       (modules: string[], onLoad: () => void, onError: () => void): void;
     };
-    MonacoEnvironment: {
-      getWorkerUrl(workerId: string, label: string): string;
-    };
     monaco: {
       editor: {
         create(element: HTMLElement, options: typeof config & { readOnly?: boolean }): ConfigEditor;
