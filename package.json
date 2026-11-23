@@ -1,6 +1,6 @@
 {
   "name": "nestcloud",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "NestCloud 注册中心与配置中心",
   "license": "UNLICENSED",
