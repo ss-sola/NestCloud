@@ -42,7 +42,7 @@ pnpm test
 pnpm tsgo
 ```
 
-开发和修复分支通过 PR 合入 `dev/master`。发布时，从本仓库的 `dev/master` 向 `master` 发起 PR，并使用 Merge Commit。两个目标分支均要求 GitHub Actions 通过 lint、测试、类型检查和构建，发布 PR 还会检查来源分支。
+开发和修复分支通过 PR 合入 `dev/master`。发布时，从本仓库的 `dev/master` 向 `master` 发起 PR，并使用 **Squash and merge** 将本次发布压缩为一条提交。两个目标分支均要求 GitHub Actions 通过 lint、测试、类型检查和构建，发布 PR 还会检查来源分支。
 
 草稿编辑、并发发布和版本拉取见[配置文件接口](docs/config-center/接口清单.md)。新注册的实例可提供完整的 HTTP(S) 地址或主机和端口，地址解析与兼容约定见[注册与发现接口](docs/registry-center/注册与发现接口.md)。
 

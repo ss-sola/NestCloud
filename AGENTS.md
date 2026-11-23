@@ -11,7 +11,7 @@
 - 修复 bug 统一使用固定分支 `feature/test`，修复完成后可合入 `dev/master`。
 - `dev/master` 和 `master` 均通过 GitHub Pull Request 更新。合并前必须通过 lint、测试、类型检查和构建。
 - PR 合并后，删除本次合入的 `feature/*` 本地分支及其对应的远端分支（如存在）。删除前须确认待删分支的最新提交已包含在远端 `dev/master` 中。固定分支 `feature/test` 在本地和远端均须保留。
-- `master` 用于打包和创建发布标签（tag）。发布 PR 必须从本仓库的 `dev/master` 发起，合并时使用 Merge Commit。
+- `master` 用于打包和创建发布标签（tag）。发布 PR 必须从本仓库的 `dev/master` 发起，检查通过后使用 **Squash and merge**（压缩合并），使每次发布在 `master` 上只新增一条提交记录。
 
 ## Git 提交信息约束
 
