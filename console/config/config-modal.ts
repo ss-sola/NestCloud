@@ -1,4 +1,5 @@
 import type { ConfigEditor, ConfigModal, ConfigSnapshot } from './types.js';
+import { fetchControlPlane } from '../control-plane-auth.js';
 import { getConfigById, loadConfigData, loadVersionHistory } from './config-data.js';
 import { getConfigEditors, setEditorLanguage } from './config-editor.js';
 import {
@@ -180,7 +181,7 @@ export function deleteConfig(id: number) {
   elements.confirmDeleteBtn.onclick = async () => {
     try {
       showLoading();
-      const res = await fetch(`${location.origin}/api/config-files`, {
+      const res = await fetchControlPlane(`${location.origin}/api/config-files`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -217,7 +218,7 @@ export async function saveConfig(publish = false) {
 
   try {
     showLoading();
-    const res = await fetch(`${location.origin}/api/config-files`, {
+    const res = await fetchControlPlane(`${location.origin}/api/config-files`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -227,9 +228,12 @@ export async function saveConfig(publish = false) {
     const saved = await checkRes<Pick<ConfigSnapshot, 'id'>>(res);
 
     if (publish) {
-      const publishRes = await fetch(`${location.origin}/api/config-files/${saved.id}/publish`, {
-        method: 'POST',
-      });
+      const publishRes = await fetchControlPlane(
+        `${location.origin}/api/config-files/${saved.id}/publish`,
+        {
+          method: 'POST',
+        },
+      );
       await checkRes(publishRes);
     }
 
@@ -258,9 +262,12 @@ export async function publishConfig(id: number) {
 
   try {
     showLoading();
-    const res = await fetch(`${location.origin}/api/config-files/${target.id}/publish`, {
-      method: 'POST',
-    });
+    const res = await fetchControlPlane(
+      `${location.origin}/api/config-files/${target.id}/publish`,
+      {
+        method: 'POST',
+      },
+    );
     await checkRes(res);
     await loadConfigData();
     showAlert('配置已发布', 'success');

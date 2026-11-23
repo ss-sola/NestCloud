@@ -1,6 +1,6 @@
 import { createClient, type RedisClientType } from '@redis/client';
 import { Logger } from '@nestjs/common';
-import { EXPIRE_REGISTRY_LEASE, RENEW_REGISTRY_LEASE } from '../constants/registry-lease.constants';
+import { EXPIRE_REGISTRY_LEASE, WRITE_REGISTRY_LEASE } from '../constants/registry-lease.constants';
 import {
   CLEAR_INTERVAL,
   CLEAR_TIMEOUT,
@@ -10,6 +10,7 @@ import {
 import {
   RegistryAuditEvent,
   RegistryAuditEventType,
+  RegistryInstance,
   RegistryMetricSnapshot,
   RegistryOverview,
   RegistryRegistration,
@@ -18,6 +19,7 @@ import {
   RegistryStorageType,
   ServiceInstance,
 } from './registry.types';
+import { RegistryHealthUtil } from './utils/registry-health.util';
 
 type RegistryStoreOptions = {
   clearInterval?: number;
@@ -45,42 +47,54 @@ const EMPTY_METRICS = (): RegistryMetricSnapshot => ({
 export abstract class RegistryStore {
   abstract readonly storageType: RegistryStorageType;
   protected readonly auditLimit: number;
+  private readonly heartbeatTimeout: number;
   private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor(options: RegistryStoreOptions = {}) {
     this.auditLimit = options.auditLimit ?? DEFAULT_AUDIT_LIMIT;
-    this.startCleanupTask(
-      options.clearInterval ?? CLEAR_INTERVAL,
-      options.clearTimeout ?? CLEAR_TIMEOUT,
-    );
+    this.heartbeatTimeout = options.clearTimeout ?? CLEAR_TIMEOUT;
+    this.startCleanupTask(options.clearInterval ?? CLEAR_INTERVAL);
   }
 
   abstract register(instance: RegistryRegistration): Promise<ServiceInstance>;
   abstract unregister(id: string): Promise<boolean>;
+  abstract setAvailability(id: string, enabled: boolean): Promise<boolean>;
   abstract heartbeat(id: string): Promise<{ success: boolean }>;
   abstract getService(name: string, group?: string): Promise<ServiceInstance[]>;
   abstract cleanup(timeout: number): Promise<void>;
-  abstract getAllInstances(): Promise<ServiceInstance[]>;
+  abstract getAllInstances(): Promise<RegistryInstance[]>;
   abstract getMetrics(): Promise<RegistryMetricSnapshot>;
   abstract getAuditLogs(limit?: number): Promise<RegistryAuditEvent[]>;
   abstract destroy(): Promise<void>;
 
   async getAll() {
-    return groupInstancesByService(await this.getAllInstances());
+    return groupInstancesByService(
+      (await this.getAllInstances()).filter((instance) => !instance.disabled),
+    );
   }
 
   async getOverview(): Promise<RegistryOverview> {
     const instances = await this.getAllInstances();
+    const cutoff = Date.now() - this.heartbeatTimeout;
+    const timedOutInstanceCount = instances.filter(
+      (instance) => instance.lastHeartbeat < cutoff,
+    ).length;
     const metrics = await this.getMetrics();
     const [latestAudit] = await this.getAuditLogs(1);
 
-    return buildOverview(
-      instances,
-      metrics,
-      latestAudit,
-      this.storageType,
-      await this.getAuditCount(),
-    );
+    return {
+      ...buildOverview(
+        instances.filter((instance) => !instance.disabled),
+        metrics,
+        latestAudit,
+        this.storageType,
+        await this.getAuditCount(),
+      ),
+      heartbeat: {
+        healthyInstanceCount: instances.length - timedOutInstanceCount,
+        timedOutInstanceCount,
+      },
+    };
   }
 
   async getServiceSummaries(query: RegistryServiceQuery = {}): Promise<RegistryServiceSummary[]> {
@@ -91,11 +105,17 @@ export abstract class RegistryStore {
     return (await this.getAuditLogs(this.auditLimit)).length;
   }
 
-  private startCleanupTask(interval: number, timeout: number): void {
+  protected renewLease(instance: RegistryInstance) {
+    const now = Math.max(Date.now(), instance.lastHeartbeat);
+    instance.heartbeatSuccessStreak = RegistryHealthUtil.nextSuccessStreak(instance, now);
+    instance.lastHeartbeat = now;
+  }
+
+  private startCleanupTask(interval: number): void {
     if (this.cleanupTimer) return;
 
     this.cleanupTimer = setInterval(() => {
-      void this.cleanup(timeout).catch((err) => {
+      void this.cleanup(this.heartbeatTimeout).catch((err) => {
         logger.error(
           `[RegistryStore] cleanup error: ${err instanceof Error ? err.message : String(err)}`,
           err instanceof Error ? err.stack : undefined,
@@ -114,12 +134,12 @@ export abstract class RegistryStore {
 
 export class MemoryRegistryStore extends RegistryStore {
   readonly storageType: RegistryStorageType = 'memory';
-  private readonly serviceMap = new Map<string, Map<string, ServiceInstance>>();
-  private readonly cacheMap = new Map<string, ServiceInstance>();
+  private readonly serviceMap = new Map<string, Map<string, RegistryInstance>>();
+  private readonly cacheMap = new Map<string, RegistryInstance>();
   private readonly auditLogs: RegistryAuditEvent[] = [];
   private readonly metrics = EMPTY_METRICS();
 
-  register(instance: RegistryRegistration): Promise<ServiceInstance> {
+  register(instance: RegistryRegistration): Promise<RegistryInstance> {
     const current = this.cacheMap.get(instance.id);
     if (current && current.name !== instance.name) {
       this.removeFromServiceMap(current);
@@ -128,11 +148,13 @@ export class MemoryRegistryStore extends RegistryStore {
     const nextInstance = {
       ...instance,
       lastHeartbeat: Date.now(),
+      heartbeatSuccessStreak: 0,
+      disabled: current?.disabled,
     };
 
     this.cacheMap.set(nextInstance.id, nextInstance);
     const serviceInstances =
-      this.serviceMap.get(nextInstance.name) ?? new Map<string, ServiceInstance>();
+      this.serviceMap.get(nextInstance.name) ?? new Map<string, RegistryInstance>();
     serviceInstances.set(nextInstance.id, nextInstance);
     this.serviceMap.set(nextInstance.name, serviceInstances);
     this.incrementMetric('registerCount');
@@ -153,6 +175,16 @@ export class MemoryRegistryStore extends RegistryStore {
     return Promise.resolve(true);
   }
 
+  setAvailability(id: string, enabled: boolean): Promise<boolean> {
+    const instance = this.cacheMap.get(id);
+    if (!instance) return Promise.resolve(false);
+    if (Boolean(instance.disabled) === enabled) {
+      instance.disabled = enabled ? undefined : true;
+      this.pushAudit(createAvailabilityAudit(instance, enabled));
+    }
+    return Promise.resolve(true);
+  }
+
   heartbeat(id: string): Promise<{ success: boolean }> {
     const instance = this.cacheMap.get(id);
     if (!instance) {
@@ -168,14 +200,14 @@ export class MemoryRegistryStore extends RegistryStore {
       return Promise.resolve({ success: false });
     }
 
-    instance.lastHeartbeat = Date.now();
+    this.renewLease(instance);
     this.incrementMetric('heartbeatSuccessCount');
     return Promise.resolve({ success: true });
   }
 
   getService(name: string, group?: string): Promise<ServiceInstance[]> {
     const instances = Array.from(this.serviceMap.get(name)?.values() ?? []).filter(
-      (instance) => !group || instance.group === group,
+      (instance) => !instance.disabled && (!group || instance.group === group),
     );
 
     this.incrementMetric('discoverCount');
@@ -211,7 +243,7 @@ export class MemoryRegistryStore extends RegistryStore {
     return Promise.resolve();
   }
 
-  getAllInstances(): Promise<ServiceInstance[]> {
+  getAllInstances(): Promise<RegistryInstance[]> {
     return Promise.resolve(Array.from(this.cacheMap.values()).sort(sortInstances));
   }
 
@@ -291,21 +323,24 @@ export class RedisRegistryStore extends RegistryStore {
 
   async register(instance: RegistryRegistration) {
     await this.ensureReady();
-    const current = await this.getInstance(instance.id);
-    const nextInstance = {
-      ...instance,
-      lastHeartbeat: Date.now(),
-    };
-
-    await this.client.hSet(this.keys.instances, nextInstance.id, JSON.stringify(nextInstance));
-    if (current && current.name !== instance.name) {
-      await this.syncServiceIndex(current, false);
+    for (;;) {
+      const snapshot = (await this.client.hGet(this.keys.instances, instance.id)) ?? null;
+      const current = parseInstance(snapshot);
+      const nextInstance = {
+        ...instance,
+        lastHeartbeat: Date.now(),
+        heartbeatSuccessStreak: 0,
+        disabled: current?.disabled,
+      };
+      if (!(await this.writeLease(nextInstance, snapshot))) continue;
+      if (current && current.name !== instance.name) {
+        await this.syncServiceIndex(current, false);
+      }
+      await this.syncServiceIndex(nextInstance, !nextInstance.disabled);
+      await this.incrementMetric('registerCount');
+      await this.pushAudit(createAuditEvent('register', nextInstance, '实例已注册或更新'));
+      return nextInstance;
     }
-    await this.syncServiceIndex(nextInstance, true);
-    await this.incrementMetric('registerCount');
-    await this.pushAudit(createAuditEvent('register', nextInstance, '实例已注册或更新'));
-
-    return nextInstance;
   }
 
   async unregister(id: string) {
@@ -321,6 +356,22 @@ export class RedisRegistryStore extends RegistryStore {
     return true;
   }
 
+  async setAvailability(id: string, enabled: boolean) {
+    await this.ensureReady();
+    for (;;) {
+      const snapshot = (await this.client.hGet(this.keys.instances, id)) ?? null;
+      const instance = parseInstance(snapshot);
+      if (!instance) return false;
+      if (Boolean(instance.disabled) !== enabled) return true;
+
+      instance.disabled = enabled ? undefined : true;
+      if (!(await this.writeLease(instance, snapshot))) continue;
+      await this.syncServiceIndex(instance, enabled);
+      await this.pushAudit(createAvailabilityAudit(instance, enabled));
+      return true;
+    }
+  }
+
   async heartbeat(id: string) {
     await this.ensureReady();
     for (;;) {
@@ -328,12 +379,8 @@ export class RedisRegistryStore extends RegistryStore {
       const instance = parseInstance(snapshot ?? null);
       if (!snapshot || !instance) break;
 
-      instance.lastHeartbeat = Math.max(Date.now(), instance.lastHeartbeat);
-      const renewed = await this.client.eval(RENEW_REGISTRY_LEASE, {
-        keys: [this.keys.instances],
-        arguments: [id, snapshot, JSON.stringify(instance)],
-      });
-      if (renewed === 1) {
+      this.renewLease(instance);
+      if (await this.writeLease(instance, snapshot)) {
         await this.incrementMetric('heartbeatSuccessCount');
         return { success: true };
       }
@@ -354,7 +401,8 @@ export class RedisRegistryStore extends RegistryStore {
   async getService(name: string, group?: string) {
     // 实例哈希是租约的事实来源。旧服务索引跨槽维护，其短暂滞后不应影响服务发现。
     const instances = (await this.readInstances()).filter(
-      (instance) => instance.name === name && (!group || instance.group === group),
+      (instance) =>
+        !instance.disabled && instance.name === name && (!group || instance.group === group),
     );
 
     await this.incrementMetric('discoverCount');
@@ -407,7 +455,7 @@ export class RedisRegistryStore extends RegistryStore {
     const rawInstances = await this.client.hVals(this.keys.instances);
     return rawInstances
       .map(parseInstance)
-      .filter((instance): instance is ServiceInstance => instance !== null);
+      .filter((instance): instance is RegistryInstance => instance !== null);
   }
 
   async getMetrics() {
@@ -446,6 +494,15 @@ export class RedisRegistryStore extends RegistryStore {
     return parseInstance(raw ?? null);
   }
 
+  private async writeLease(instance: RegistryInstance, snapshot: string | null) {
+    return (
+      (await this.client.eval(WRITE_REGISTRY_LEASE, {
+        keys: [this.keys.instances],
+        arguments: [instance.id, snapshot ?? '', JSON.stringify(instance)],
+      })) === 1
+    );
+  }
+
   private async removeInstance(instance: ServiceInstance) {
     await this.client.hDel(this.keys.instances, instance.id);
     await this.syncServiceIndex(instance, false);
@@ -458,7 +515,7 @@ export class RedisRegistryStore extends RegistryStore {
       if (listed) await this.client.sAdd(key, instance.id);
       else await this.client.sRem(key, instance.id);
       const current = await this.getInstance(instance.id);
-      const shouldList = current?.name === instance.name;
+      const shouldList = current?.name === instance.name && !current.disabled;
       if (listed === shouldList) return;
       listed = shouldList;
     }
@@ -488,9 +545,13 @@ function groupInstancesByService(instances: ServiceInstance[]) {
   );
 }
 
-function buildServiceSummaries(instances: ServiceInstance[], query: RegistryServiceQuery) {
+function buildServiceSummaries(
+  instances: RegistryInstance[],
+  query: RegistryServiceQuery,
+): RegistryServiceSummary[] {
   const normalizedSearch = query.search?.trim().toLowerCase();
-  const summaryMap = new Map<string, RegistryServiceSummary>();
+  const now = Date.now();
+  const summaryMap = new Map<string, Omit<RegistryServiceSummary, 'health' | 'healthScore'>>();
 
   for (const instance of instances) {
     if (normalizedSearch && !instance.name.toLowerCase().includes(normalizedSearch)) {
@@ -510,8 +571,11 @@ function buildServiceSummaries(instances: ServiceInstance[], query: RegistryServ
       instances: [],
     };
 
-    summary.instances.push(instance);
-    summary.instanceCount += 1;
+    summary.instances.push({
+      ...instance,
+      health: RegistryHealthUtil.instanceHealth(instance, now),
+    });
+    if (!instance.disabled) summary.instanceCount += 1;
     if (instance.group && !summary.groups.includes(instance.group)) {
       summary.groups.push(instance.group);
     }
@@ -526,6 +590,7 @@ function buildServiceSummaries(instances: ServiceInstance[], query: RegistryServ
   return Array.from(summaryMap.values())
     .map((summary) => ({
       ...summary,
+      ...RegistryHealthUtil.serviceHealth(summary.instances),
       groups: summary.groups.sort(),
       instances: summary.instances.sort(sortInstances),
     }))
@@ -538,7 +603,7 @@ function buildOverview(
   latestAudit: RegistryAuditEvent | undefined,
   storageType: RegistryStorageType,
   auditCount: number,
-): RegistryOverview {
+): Omit<RegistryOverview, 'heartbeat'> {
   const services = new Set<string>();
   const groups = new Set<string>();
   let latestHeartbeat = 0;
@@ -582,6 +647,14 @@ function createAuditEvent(
   };
 }
 
+function createAvailabilityAudit(instance: RegistryInstance, enabled: boolean) {
+  return createAuditEvent(
+    enabled ? 'enable' : 'disable',
+    instance,
+    enabled ? '实例已恢复服务发现' : '实例已手动摘除',
+  );
+}
+
 function createAuditId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -596,7 +669,9 @@ function parseInstance(raw: string | null) {
   }
 
   try {
-    return JSON.parse(raw) as ServiceInstance;
+    const instance = JSON.parse(raw) as RegistryInstance & { heartbeatInterval?: unknown };
+    delete instance.heartbeatInterval;
+    return instance;
   } catch {
     return null;
   }

@@ -3,13 +3,33 @@ import type { ServiceInstance } from '@nest-cloud/sdk';
 export type { ServiceInstance };
 
 /** 租约时间由存储层在注册或续约时生成。 */
-export type RegistryRegistration = Omit<ServiceInstance, 'lastHeartbeat'>;
+export type RegistryRegistration = Omit<
+  RegistryInstance,
+  'lastHeartbeat' | 'disabled' | 'heartbeatSuccessStreak'
+>;
+
+export interface RegistryInstance extends ServiceInstance {
+  /** 旧租约可能未记录连续成功次数。 */
+  heartbeatSuccessStreak?: number;
+  /** 控制台已暂停该实例参与服务发现，租约仍可续约。 */
+  disabled?: true;
+}
+
+export type RegistryInstanceHealth = 'healthy' | 'warning' | 'critical';
+
+export type RegistryServiceHealth = RegistryInstanceHealth | 'unavailable';
+
+export interface RegistryInstanceSummary extends RegistryInstance {
+  health: RegistryInstanceHealth;
+}
 
 export type RegistryStorageType = 'memory' | 'redis';
 
 export type RegistryAuditEventType =
   | 'register'
   | 'unregister'
+  | 'disable'
+  | 'enable'
   | 'expire'
   | 'heartbeat-miss'
   | 'discover-miss';
@@ -45,6 +65,10 @@ export interface RegistryOverview {
   auditCount: number;
   latestHeartbeatAt?: string;
   latestChangeAt?: string;
+  heartbeat: {
+    healthyInstanceCount: number;
+    timedOutInstanceCount: number;
+  };
   metrics: RegistryMetricSnapshot;
 }
 
@@ -56,8 +80,10 @@ export interface RegistryServiceQuery {
 export interface RegistryServiceSummary {
   name: string;
   instanceCount: number;
+  health: RegistryServiceHealth;
+  healthScore: number | null;
   groups: string[];
   latestHeartbeat: number;
   latestHeartbeatAt?: string;
-  instances: ServiceInstance[];
+  instances: RegistryInstanceSummary[];
 }

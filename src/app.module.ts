@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { EnableConfigCenter, EnableTypeOrm } from '@nest-cloud/sdk';
+import { EnableTypeOrm } from '@nest-cloud/sdk';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 

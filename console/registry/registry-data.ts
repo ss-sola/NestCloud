@@ -1,4 +1,5 @@
 import { checkRes, hideLoading, showAlert, showLoading } from '../utils.js';
+import { fetchControlPlane } from '../control-plane-auth.js';
 import { renderRegistryDashboard } from './registry-ui.js';
 
 interface RegistryOverview {
@@ -8,16 +9,20 @@ interface RegistryOverview {
   auditCount: number;
   latestHeartbeatAt?: string;
   latestChangeAt?: string;
+  heartbeat: {
+    healthyInstanceCount: number;
+    timedOutInstanceCount: number;
+  };
   metrics: {
     registerCount: number;
     unregisterCount: number;
     expireCount: number;
-    heartbeatSuccessCount: number;
-    heartbeatFailureCount: number;
     discoverCount: number;
     discoverMissCount: number;
   };
 }
+
+type RegistryInstanceHealth = 'healthy' | 'warning' | 'critical';
 
 interface RegistryInstance {
   id: string;
@@ -26,12 +31,18 @@ interface RegistryInstance {
   port: number;
   group?: string;
   lastHeartbeat: number;
+  health: RegistryInstanceHealth;
+  disabled?: true;
   metadata?: Record<string, unknown>;
 }
+
+export type RegistryServiceHealth = RegistryInstanceHealth | 'unavailable';
 
 interface RegistryService {
   name: string;
   instanceCount: number;
+  health: RegistryServiceHealth;
+  healthScore: number | null;
   groups: string[];
   latestHeartbeatAt?: string;
   instances: RegistryInstance[];
@@ -119,25 +130,22 @@ export function selectRegistryService(serviceName: string) {
   renderRegistryDashboard();
 }
 
-export async function removeRegistryInstance(instanceId: string) {
-  showLoading();
-  try {
-    const response = await fetch(
-      `${location.origin}/api/registry/unregister/${encodeURIComponent(instanceId)}`,
-      {
-        method: 'POST',
-      },
-    );
-    await checkRes<boolean>(response);
-    showAlert('实例已从注册中心移除');
-    await loadRegistryDashboard({}, { silent: true });
-  } finally {
-    hideLoading();
-  }
+export async function setRegistryInstanceAvailability(id: string, enabled: boolean) {
+  const response = await fetchControlPlane('/api/registry/availability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, state: enabled ? 'enabled' : 'disabled' }),
+  }).catch((error: unknown) => {
+    showAlert('无法连接注册中心，请重试', 'danger');
+    throw error;
+  });
+  await checkRes<boolean>(response);
+  showAlert(enabled ? '实例已恢复服务发现' : '实例已摘除');
+  await loadRegistryDashboard({}, { silent: true });
 }
 
 async function fetchOverview() {
-  const response = await fetch(`${location.origin}/api/registry/overview`);
+  const response = await fetchControlPlane(`${location.origin}/api/registry/overview`);
   return checkRes<RegistryOverview>(response);
 }
 
@@ -151,7 +159,7 @@ async function fetchServices() {
   }
 
   const queryString = params.toString();
-  const response = await fetch(
+  const response = await fetchControlPlane(
     `${location.origin}/api/registry/services${queryString ? `?${queryString}` : ''}`,
   );
   return checkRes<RegistryService[]>(response);
@@ -160,6 +168,8 @@ async function fetchServices() {
 async function fetchAudits() {
   const params = new URLSearchParams();
   params.set('limit', String(registryQuery.auditLimit));
-  const response = await fetch(`${location.origin}/api/registry/audits?${params.toString()}`);
+  const response = await fetchControlPlane(
+    `${location.origin}/api/registry/audits?${params.toString()}`,
+  );
   return checkRes<RegistryAudit[]>(response);
 }

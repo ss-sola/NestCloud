@@ -6,10 +6,24 @@ import {
   registryOverview,
   registryQuery,
   registryServices,
-  removeRegistryInstance,
   selectRegistryService,
   selectedServiceName,
+  setRegistryInstanceAvailability,
+  type RegistryServiceHealth,
 } from './registry-data.js';
+
+const healthLabels: Record<RegistryServiceHealth, string> = {
+  healthy: '健康',
+  warning: '预警',
+  critical: '连续失败',
+  unavailable: '无可用实例',
+};
+
+function renderHealthBadge(health: RegistryServiceHealth, score?: number | null) {
+  const label = health === 'critical' && score != null ? '异常' : healthLabels[health];
+  const text = score == null ? label : `${label} · ${score} 分`;
+  return `<span class="registry-badge text-nowrap health-${escapeHtml(health)}">${escapeHtml(text)}</span>`;
+}
 
 export function bindRegistryEvents() {
   elementById('registryRefreshBtn').onclick = () => loadRegistryDashboard();
@@ -45,8 +59,8 @@ function renderOverview() {
   elementById('unregisterMetricCount').textContent = String(
     (registryOverview.metrics?.unregisterCount ?? 0) + (registryOverview.metrics?.expireCount ?? 0),
   );
-  elementById('heartbeatMetricCount').textContent =
-    `${registryOverview.metrics?.heartbeatSuccessCount ?? 0} / ${registryOverview.metrics?.heartbeatFailureCount ?? 0}`;
+  elementById('heartbeatInstanceCount').textContent =
+    `${registryOverview.heartbeat?.healthyInstanceCount ?? 0} / ${registryOverview.heartbeat?.timedOutInstanceCount ?? 0}`;
   elementById('discoverMetricCount').textContent =
     `${registryOverview.metrics?.discoverCount ?? 0} / ${registryOverview.metrics?.discoverMissCount ?? 0}`;
   elementById('registryLatestHeartbeat').textContent =
@@ -93,6 +107,7 @@ function renderServiceTable() {
     tr.innerHTML = `
       <td><a href="#" class="registry-table-link" data-name="${escapeHtml(service.name)}">${escapeHtml(service.name)}</a></td>
       <td>${service.instanceCount}</td>
+      <td>${renderHealthBadge(service.health ?? 'unavailable', service.healthScore)}</td>
       <td>
         <div class="registry-group-badges">
           ${
@@ -129,7 +144,7 @@ function renderInstanceTable() {
 
   elementById('selectedServiceName').textContent = selectedService?.name || '-';
   elementById('selectedServiceInstanceCount').textContent = String(
-    selectedService?.instanceCount || 0,
+    selectedService?.instances.length ?? 0,
   );
   elementById('selectedServiceGroups').textContent =
     selectedService?.groups?.join(', ') || '未分组';
@@ -148,16 +163,33 @@ function renderInstanceTable() {
       <td>${escapeHtml(instance.baseUrl || `${instance.host}:${instance.port}`)}</td>
       <td>${instance.group ? `<span class="registry-badge">${escapeHtml(instance.group)}</span>` : '<span class="registry-badge muted">未分组</span>'}</td>
       <td>${formatDateTime(instance.lastHeartbeat)}</td>
+      <td>${instance.health ? renderHealthBadge(instance.health) : '—'}</td>
       <td><div class="registry-instance-meta">${escapeHtml(JSON.stringify(instance.metadata || {}, null, 2))}</div></td>
-      <td><button class="btn btn-sm btn-outline-danger registry-remove-instance" data-id="${escapeHtml(instance.id)}">摘除实例</button></td>
+      <td>
+        <label class="form-check form-switch text-nowrap mb-0">
+          <input class="form-check-input registry-availability" type="checkbox" role="switch"
+            aria-label="${escapeHtml(instance.id)} 接收流量" data-id="${escapeHtml(instance.id)}"
+            ${instance.disabled ? '' : 'checked'} />
+          <span class="form-check-label">接收流量</span>
+        </label>
+      </td>
     `;
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll<HTMLButtonElement>('.registry-remove-instance').forEach((element) => {
-    element.onclick = async () => {
+  tbody.querySelectorAll<HTMLInputElement>('.registry-availability').forEach((element) => {
+    element.onchange = async () => {
       const { id } = element.dataset;
-      if (id !== undefined) await removeRegistryInstance(id);
+      if (id === undefined) return;
+      const enabled = element.checked;
+      element.disabled = true;
+      try {
+        await setRegistryInstanceAvailability(id, enabled);
+      } catch {
+        element.checked = !enabled;
+      } finally {
+        element.disabled = false;
+      }
     };
   });
 }
@@ -193,6 +225,10 @@ function formatAuditType(type: string) {
       return '注册';
     case 'unregister':
       return '下线';
+    case 'disable':
+      return '手动摘除';
+    case 'enable':
+      return '恢复';
     case 'expire':
       return '超时摘除';
     case 'heartbeat-miss':

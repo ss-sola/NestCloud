@@ -44,6 +44,22 @@
     <div class="loading-overlay" id="loadingOverlay">
       <div class="spinner"></div>
     </div>
+    <dialog id="controlPlaneAuth" class="control-plane-dialog" aria-labelledby="controlPlaneAuthTitle">
+      <form id="controlPlaneAuthForm" method="dialog">
+        <h1 id="controlPlaneAuthTitle">进入控制台</h1>
+        <label for="controlPlaneAuthToken" class="form-label">访问令牌</label>
+        <input
+          id="controlPlaneAuthToken"
+          type="password"
+          class="form-control"
+          autocomplete="off"
+          aria-describedby="controlPlaneAuthStatus"
+          required
+        />
+        <p id="controlPlaneAuthStatus" class="control-plane-dialog-status" role="status"></p>
+        <button id="controlPlaneAuthSubmit" type="submit" class="btn control-plane-dialog-submit">验证</button>
+      </form>
+    </dialog>
     <!-- 引入必要的JS库 -->
     <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="./vendor/monaco-editor/min/vs/loader.js"></script>
