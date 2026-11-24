@@ -157,7 +157,15 @@ export class ConfigFileService extends BaseService<ConfigFile> {
   async pullPublishedConfigs(options: PullConfigOptions) {
     const candidateNames = this.resolveNames(options.serviceName, options.names);
 
-    const where = candidateNames.map((name) => ({
+    // 服务默认文件从 JSON 迁移至 JSONC；精确匹配优先，仅缺失时使用另一后缀。
+    const json = `${options.serviceName}.json`;
+    const jsonc = `${options.serviceName}.jsonc`;
+    const lookupNames = new Set(candidateNames);
+    if (options.serviceName && (lookupNames.has(json) || lookupNames.has(jsonc))) {
+      lookupNames.add(json);
+      lookupNames.add(jsonc);
+    }
+    const where = [...lookupNames].map((name) => ({
       name,
       isPublished: true,
     }));
@@ -180,12 +188,14 @@ export class ConfigFileService extends BaseService<ConfigFile> {
         invalidNames.add(file.name);
       }
     }
-    if (invalidNames.size) {
-      throw new ProjectException('所选配置缺少可解析的已发布版本', HttpStatus.UNPROCESSABLE_ENTITY);
-    }
-
     const ordered = candidateNames.flatMap((name) => {
-      const match = selected.get(name);
+      const alternate = name === jsonc ? json : name === json ? jsonc : '';
+      const resolvedName = options.serviceName && alternate && !candidateNames.includes(alternate)
+        && !selected.has(name) && !invalidNames.has(name) ? alternate : name;
+      if (invalidNames.has(resolvedName)) {
+        throw new ProjectException('所选配置缺少可解析的已发布版本', HttpStatus.UNPROCESSABLE_ENTITY);
+      }
+      const match = selected.get(resolvedName);
       return match ? [match] : [];
     });
     const mergedConfig = ordered.reduce<Record<string, unknown>>(
@@ -295,7 +305,7 @@ export class ConfigFileService extends BaseService<ConfigFile> {
       return [...new Set(names.filter(Boolean))];
     }
 
-    const defaults = ['application.yaml', 'application.yml', 'application.json', 'application.env'];
+    const defaults = ['application.yaml', 'application.yml', 'application.json', 'application.env', 'application.jsonc'];
 
     if (!serviceName) {
       return defaults;
@@ -307,6 +317,7 @@ export class ConfigFileService extends BaseService<ConfigFile> {
       `${serviceName}.yml`,
       `${serviceName}.json`,
       `${serviceName}.env`,
+      `${serviceName}.jsonc`,
     ];
   }
 

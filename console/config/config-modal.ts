@@ -63,15 +63,15 @@ export async function openAddModal() {
   currentConfigId = null;
   elements.modalTitle.textContent = '新增配置';
   elements.configName.value = '';
-  elements.configFormat.value = 'yaml';
+  elements.configFormat.value = 'jsonc';
   elements.configVersion.textContent = '0';
   elements.configStatus.textContent = '草稿';
   elements.configPublishedAt.textContent = '未发布';
   elements.configMd5.textContent = '-';
   elements.configDescription.value = '';
   elements.modalHint.textContent = '保存只更新草稿，发布会递增版本号并立即生效。';
-  setEditorLanguage(editors.editor, 'yaml');
-  setEditorContent(editors.editor, '');
+  setEditorLanguage(editors.editor, 'jsonc');
+  setEditorContent(editors.editor, '{\n  \n}');
   configModal.show();
 }
 
@@ -118,7 +118,8 @@ function openViewSnapshot(viewEditor: ConfigEditor, config: ConfigSnapshot, titl
   elements.viewConfigVersion.textContent = String(config.version ?? 0);
   elements.viewConfigStatus.textContent = config.isPublished ? '已发布' : '草稿';
   elements.viewConfigPublishedAt.textContent = formatDateTime(config.publishedAt);
-  elements.viewConfigDescription.textContent = config.description || '暂无说明';
+  elements.viewConfigDescription.textContent = config.description || '';
+  elementById('viewDescriptionGroup').hidden = !config.description;
   setEditorLanguage(viewEditor, config.format);
   setEditorContent(viewEditor, config.content);
 }

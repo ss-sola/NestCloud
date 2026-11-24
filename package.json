@@ -5,6 +5,7 @@
   "description": "NestCloud 注册中心与配置中心",
   "license": "UNLICENSED",
   "scripts": {
+    "docker:build": "docker buildx bake --allow=fs.read=.. --file docker-bake.hcl --load",
     "build": "pnpm run build:console && nest build",
     "build:console": "tsc -p tsconfig.console.json && node scripts/copy-console-assets.mts",
     "start": "pnpm run build:console && nest start",
@@ -35,6 +36,7 @@
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
     "js-yaml": "^5.5.0",
+    "jsonc-parser": "3.3.1",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
