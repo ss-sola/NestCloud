@@ -32,6 +32,10 @@ pnpm build
 pnpm start:prod
 ```
 
+## Docker 打包
+
+在本仓库根目录执行 `pnpm run docker:build`，即可打包注册中心及其管理控制台。镜像名称为 `solacloud/nestcloud:local`。[Docker 打包与启动](docs/project/部署与可观测性.md#docker-镜像)
+
 ## 验证
 
 安装开发依赖后，Husky 的 `pre-commit` 钩子会格式化已暂存文件，并对已暂存源码运行 oxlint。

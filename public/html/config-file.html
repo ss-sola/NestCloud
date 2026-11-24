@@ -1,154 +1,65 @@
 <div>
-  <!-- 新增/编辑配置弹窗 -->
-  <div class="modal fade" id="configModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content config-modal-shell">
+  <div class="modal fade config-workspace" id="configModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-md-down">
+      <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="modalTitle">新增配置</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
+          <h2 class="modal-title fs-5" id="modalTitle">新增配置</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
         </div>
         <div class="modal-body">
-          <form id="configForm">
-            <div class="config-form-grid">
-              <div class="mb-3">
-                <label for="configName" class="form-label">名称</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="configName"
-                  placeholder="例如 application.yaml"
-                  required
-                />
-              </div>
-              <div class="mb-3">
-                <label for="configFormat" class="form-label">格式</label>
-                <select class="form-select" id="configFormat" required>
-                  <option value="yaml">YAML</option>
-                  <option value="yml">YML</option>
-                  <option value="json">JSON</option>
-                  <option value="env">ENV</option>
-                  <option value="properties">Properties</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="config-meta-row mb-3">
-              <div class="meta-chip">
-                <span class="meta-label">版本</span>
-                <strong id="configVersion">0</strong>
-              </div>
-              <div class="meta-chip">
-                <span class="meta-label">状态</span>
-                <strong id="configStatus">草稿</strong>
-              </div>
-              <div class="meta-chip meta-chip-wide">
-                <span class="meta-label">发布时间</span>
-                <strong id="configPublishedAt">未发布</strong>
-              </div>
-              <div class="meta-chip meta-chip-wide">
-                <span class="meta-label">MD5</span>
-                <strong id="configMd5">-</strong>
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label for="configDescription" class="form-label">说明</label>
-              <textarea
-                class="form-control"
-                id="configDescription"
-                rows="2"
-                placeholder="描述这份配置的用途、影响范围和注意事项"
-              ></textarea>
-            </div>
-
-            <div class="mb-3">
-              <div class="editor-toolbar">
-                <label class="form-label mb-0">配置内容</label>
-                <div class="editor-toolbar-actions">
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary btn-sm"
-                    id="formatJsonBtn"
-                  >
-                    格式化内容
-                  </button>
-                </div>
-              </div>
+          <form id="configForm" class="config-layout">
+            <aside class="config-inspector">
+              <label class="config-field">文件名<input class="form-control" id="configName" placeholder="例如 system-service.jsonc" required /></label>
+              <label class="config-field">格式<select class="form-select" id="configFormat" required>
+                <option value="jsonc">JSONC</option><option value="json">JSON</option>
+                <option value="yaml">YAML</option><option value="yml">YML</option>
+                <option value="env">ENV</option><option value="properties">Properties</option>
+              </select></label>
+              <label class="config-field">说明<textarea class="form-control" id="configDescription" rows="2" placeholder="配置用途（选填）"></textarea></label>
+              <dl class="config-properties">
+                <dt>版本</dt><dd id="configVersion"></dd><dt>状态</dt><dd id="configStatus"></dd>
+                <dt>发布时间</dt><dd id="configPublishedAt"></dd>
+              </dl>
+              <details class="config-checksum"><summary>MD5 校验值</summary><code id="configMd5"></code></details>
+            </aside>
+            <section class="config-source" aria-label="配置编辑器">
+              <div class="config-source-bar"><strong>配置内容</strong>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="formatJsonBtn">格式化</button></div>
               <div id="jsoneditor" class="json-editor-panel"></div>
-            </div>
+            </section>
           </form>
         </div>
         <div class="modal-footer">
-          <div class="text-muted small me-auto" id="modalHint">
-            保存只更新草稿，发布会递增版本号并立即生效。
-          </div>
-          <button type="button" class="btn btn-outline-primary" id="saveBtn">
-            保存
-          </button>
-          <button type="button" class="btn btn-primary" id="publishBtn">
-            保存并发布
-          </button>
+          <small class="text-muted me-auto" id="modalHint"></small>
+          <button type="button" class="btn btn-outline-primary" id="saveBtn">保存草稿</button>
+          <button type="button" class="btn btn-primary" id="publishBtn">保存并发布</button>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- 查看配置弹窗 -->
-  <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content config-modal-shell">
+  <div class="modal fade config-workspace" id="viewModal" tabindex="-1" aria-labelledby="viewModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-md-down">
+      <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="viewModalTitle">查看配置</h5>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"
-          ></button>
+          <h2 class="modal-title fs-5" id="viewModalTitle">查看配置</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
         </div>
-        <div class="modal-body">
-          <div class="config-meta-row mb-3">
-            <div class="meta-chip">
-              <span class="meta-label">格式</span>
-              <strong id="viewConfigFormat">-</strong>
-            </div>
-            <div class="meta-chip">
-              <span class="meta-label">版本</span>
-              <strong id="viewConfigVersion">0</strong>
-            </div>
-            <div class="meta-chip">
-              <span class="meta-label">状态</span>
-              <strong id="viewConfigStatus">草稿</strong>
-            </div>
-            <div class="meta-chip meta-chip-wide">
-              <span class="meta-label">发布时间</span>
-              <strong id="viewConfigPublishedAt">未发布</strong>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">说明</label>
-            <div class="config-description-view" id="viewConfigDescription">-</div>
-          </div>
-          <div id="viewJsonEditor" class="json-editor-panel"></div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            data-bs-dismiss="modal"
-          >
-            关闭
-          </button>
+        <div class="modal-body config-layout">
+          <aside class="config-inspector">
+            <dl class="config-properties">
+              <dt>格式</dt><dd id="viewConfigFormat"></dd><dt>版本</dt><dd id="viewConfigVersion"></dd>
+              <dt>状态</dt><dd id="viewConfigStatus"></dd><dt>发布时间</dt><dd id="viewConfigPublishedAt"></dd>
+            </dl>
+            <div id="viewDescriptionGroup"><strong>说明</strong><p id="viewConfigDescription"></p></div>
+          </aside>
+          <section class="config-source" aria-label="配置预览">
+            <div class="config-source-bar"><strong>配置内容</strong><span>只读</span></div>
+            <div id="viewJsonEditor" class="json-editor-panel"></div>
+          </section>
         </div>
       </div>
     </div>
   </div>
-
   <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
       <div class="modal-content config-modal-shell">
@@ -265,7 +176,7 @@
             <option value="">全部格式</option>
             <option value="yaml">YAML</option>
             <option value="yml">YML</option>
-            <option value="json">JSON</option>
+            <option value="jsonc">JSONC</option><option value="json">JSON</option>
             <option value="env">ENV</option>
             <option value="properties">Properties</option>
           </select>

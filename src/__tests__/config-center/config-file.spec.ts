@@ -135,6 +135,7 @@ describe('配置草稿与发布', () => {
 
   it.each([
     ['yaml', 'service:\n  port: 42', { service: { port: 42 } }],
+    ['jsonc', '{\n// 部署地址\n"url":"https://host/a//b", /* 监听 */ "port":42\n}', { url: 'https://host/a//b', port: 42 }],
     ['env', 'export KEY="two\nlines"\nEMPTY=\n# comment', { KEY: 'two\nlines', EMPTY: '' }],
     ['properties', 'KEY: value\n! comment', { KEY: 'value' }],
   ])('已发布 %s 使用同一解析器供客户端拉取', async (format, content, expected) => {
@@ -143,6 +144,17 @@ describe('配置草稿与发布', () => {
     expect((await service.pullPublishedConfigs({ names: [draft.name] })).mergedConfig).toEqual(
       expected,
     );
+  });
+
+  it('推断 JSONC，向旧客户端返回原文和解析值，并拒绝有语法错误的草稿', async () => {
+    const content = '{ /* 监听 */ "port": 3500 }';
+    const row = await service.createOrUpdate({ name: 'worker.jsonc', content });
+    await service.publish(row.id);
+    const pull = await service.pullPublishedConfigs({ serviceName: 'worker', names: ['worker.json'] });
+    expect(pull.configs[0]).toMatchObject({ format: 'jsonc', content });
+    expect(pull.mergedConfig).toEqual({ port: 3500 });
+    const invalid = await service.update(row.id, { content: '{"port":3500} /*' });
+    await expect(service.publish(invalid.id)).rejects.toMatchObject({ status: 400 });
   });
 
   it('并发编辑和发布时冲突返回 409，重试编辑保留已发布快照', async () => {

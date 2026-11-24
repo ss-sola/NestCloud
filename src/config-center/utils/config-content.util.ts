@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { CONFIG_FILE_FORMATS } from '../../constants/config-file.constants';
+import { parse, type ParseError } from 'jsonc-parser';
 
 export class ConfigContentUtil {
   static detectFormat(name: string): string {
@@ -20,6 +21,15 @@ export class ConfigContentUtil {
     let value: unknown;
     try {
       switch (format) {
+        case 'jsonc': {
+          const errors: ParseError[] = [];
+          value = parse(content, errors);
+          if (errors.length) {
+            const line = content.slice(0, errors[0].offset).split(/\r\n|\r|\n/).length;
+            throw new ProjectException(`JSONC 第 ${line} 行语法错误`, HttpStatus.BAD_REQUEST);
+          }
+          break;
+        }
         case 'json':
           value = JSON.parse(content);
           break;

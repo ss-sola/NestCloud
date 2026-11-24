@@ -41,8 +41,9 @@ export interface ConfigQuery {
 }
 
 export interface ConfigEditor {
+  getAction(id: string): { run(): Promise<void> } | null;
   dispose(): void;
-  getModel(): object | null;
+  getModel(): { uri: { authority: string; path: string } } | null;
   getValue(): string;
   setValue(value: string): void;
 }

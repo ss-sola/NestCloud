@@ -141,8 +141,14 @@ export function bindUIEvents() {
     try {
       const format = configFormat.value;
       const content = editors.editor.getValue();
+      if (format === 'jsonc') {
+        const action = editors.editor.getAction('editor.action.formatDocument');
+        if (!action) throw new Error('编辑器格式化不可用');
+        await action.run();
+        return;
+      }
       if (format !== 'json') {
-        showAlert('当前仅支持 JSON 自动格式化', 'warning');
+        showAlert('可格式化 JSON 和 JSONC 文件', 'warning');
         return;
       }
       setEditorContent(editors.editor, JSON.parse(content));

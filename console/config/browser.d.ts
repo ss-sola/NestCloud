@@ -9,6 +9,7 @@ declare global {
       (modules: string[], onLoad: () => void, onError: () => void): void;
     };
     monaco: {
+      json: Pick<typeof import('monaco-editor').json, 'jsonDefaults'>;
       editor: {
         create(element: HTMLElement, options: typeof config & { readOnly?: boolean }): ConfigEditor;
         setModelLanguage(model: object, language: string): void;
