@@ -10,6 +10,8 @@ import {
 } from './registry.constants';
 import {
   RegistryAuditEvent,
+  MemoryLeaseChange,
+  RecoveryLease,
   RegistryAuditEventType,
   RegistryInstance,
   RegistryMetricSnapshot,
@@ -36,6 +38,8 @@ type RedisRegistryStoreOptions = RegistryStoreOptions & {
 };
 
 const logger = new Logger('RegistryStore');
+// 非 JSON 前缀使旧版中心也会在发现列表中跳过短期下线记录。
+const REMOVED_PREFIX = 'removed:';
 
 const EMPTY_METRICS = (): RegistryMetricSnapshot => ({
   registerCount: 0,
@@ -50,7 +54,7 @@ const EMPTY_METRICS = (): RegistryMetricSnapshot => ({
 export abstract class RegistryStore {
   abstract readonly storageType: RegistryStorageType;
   protected readonly auditLimit: number;
-  private readonly heartbeatTimeout: number;
+  protected readonly heartbeatTimeout: number;
   private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor(options: RegistryStoreOptions = {}) {
@@ -136,6 +140,7 @@ export abstract class RegistryStore {
 }
 
 export class MemoryRegistryStore extends RegistryStore {
+  onLeaseChange?: (kind: MemoryLeaseChange, instance: RegistryInstance) => void;
   readonly storageType: RegistryStorageType = 'memory';
   private readonly serviceMap = new Map<string, Map<string, RegistryInstance>>();
   private readonly cacheMap = new Map<string, RegistryInstance>();
@@ -165,9 +170,11 @@ export class MemoryRegistryStore extends RegistryStore {
       lastHeartbeat: Date.now(),
       heartbeatSuccessStreak: 0,
       disabled: current?.disabled,
+      availabilityUpdatedAt: current?.availabilityUpdatedAt,
     };
 
     this.rememberInstance(nextInstance);
+    this.onLeaseChange?.('register', nextInstance);
     this.incrementMetric('registerCount');
     this.pushAudit(createAuditEvent('register', nextInstance, '实例已注册或更新'));
 
@@ -181,6 +188,7 @@ export class MemoryRegistryStore extends RegistryStore {
     }
 
     this.removeInstance(instance);
+    this.onLeaseChange?.('unregister', instance);
     this.incrementMetric('unregisterCount');
     this.pushAudit(createAuditEvent('unregister', instance, '实例已下线'));
     return Promise.resolve(true);
@@ -189,10 +197,15 @@ export class MemoryRegistryStore extends RegistryStore {
   setAvailability(id: string, enabled: boolean): Promise<boolean> {
     const instance = this.cacheMap.get(id);
     if (!instance) return Promise.resolve(false);
+    instance.availabilityUpdatedAt = Math.max(
+      Date.now(),
+      (instance.availabilityUpdatedAt ?? 0) + 1,
+    );
     if (Boolean(instance.disabled) === enabled) {
       instance.disabled = enabled ? undefined : true;
       this.pushAudit(createAvailabilityAudit(instance, enabled));
     }
+    this.onLeaseChange?.('availability', instance);
     return Promise.resolve(true);
   }
 
@@ -212,6 +225,7 @@ export class MemoryRegistryStore extends RegistryStore {
     }
 
     this.renewLease(instance);
+    this.onLeaseChange?.('heartbeat', instance);
     this.incrementMetric('heartbeatSuccessCount');
     return Promise.resolve({ success: true });
   }
@@ -247,6 +261,7 @@ export class MemoryRegistryStore extends RegistryStore {
       }
 
       this.removeInstance(instance);
+      this.onLeaseChange?.('expire', instance);
       this.incrementMetric('expireCount');
       this.pushAudit(createAuditEvent('expire', instance, '实例心跳超时，已自动摘除'));
     }
@@ -342,6 +357,55 @@ export class RedisRegistryStore extends RegistryStore {
     return this.client.isReady;
   }
 
+  /** 使用原始心跳时间与共享记录合并。重试只校正最终状态，不重复累加操作计数。 */
+  async reconcile(change: RecoveryLease): Promise<void> {
+    const local = change.instance;
+    await this.ensureReady();
+    for (;;) {
+      const snapshot = (await this.client.hGet(this.keys.instances, local.id)) ?? null;
+      const current = parseInstance(snapshot);
+      if (change.kind === 'remove' || Date.now() - local.lastHeartbeat > this.heartbeatTimeout) {
+        const cutoff = change.kind === 'remove' ? change.cutoff : local.lastHeartbeat;
+        if (current && current.lastHeartbeat > cutoff) return;
+        if (!(await this.rememberRemoval(local.id, snapshot, cutoff))) continue;
+        await this.syncServiceIndex(local, false);
+        if (current && current.name !== local.name) await this.syncServiceIndex(current, false);
+        return;
+      }
+      // Redis 重启清空数据时恢复仍然有效的本地租约；显式下线后只有更新的注册才能重建它。
+      if (
+        snapshot?.startsWith(REMOVED_PREFIX) &&
+        (change.registeredAt ?? 0) <= removedLease(snapshot).at
+      )
+        return;
+      const newerLease = !current || local.lastHeartbeat >= current.lastHeartbeat;
+      const next = {
+        ...(newerLease && change.registeredAt !== undefined ? local : (current ?? local)),
+      };
+      if (newerLease) {
+        next.lastHeartbeat = local.lastHeartbeat;
+        next.heartbeatSuccessStreak = local.heartbeatSuccessStreak;
+      }
+      if (current) {
+        next.disabled = current.disabled;
+        next.availabilityUpdatedAt = current.availabilityUpdatedAt;
+      }
+      const localTime = local.availabilityUpdatedAt ?? 0;
+      const sharedTime = current?.availabilityUpdatedAt ?? 0;
+      if (
+        change.availabilityChanged &&
+        (localTime > sharedTime || (localTime === sharedTime && local.disabled))
+      ) {
+        next.disabled = local.disabled;
+        next.availabilityUpdatedAt = localTime;
+      }
+      if (!(await this.writeLease(next, snapshot))) continue;
+      if (current && current.name !== next.name) await this.syncServiceIndex(current, false);
+      await this.syncServiceIndex(next, !next.disabled);
+      return;
+    }
+  }
+
   async register(instance: RegistryRegistration) {
     await this.ensureReady();
     for (;;) {
@@ -352,6 +416,7 @@ export class RedisRegistryStore extends RegistryStore {
         lastHeartbeat: Date.now(),
         heartbeatSuccessStreak: 0,
         disabled: current?.disabled,
+        availabilityUpdatedAt: current?.availabilityUpdatedAt,
       };
       if (!(await this.writeLease(nextInstance, snapshot))) continue;
       if (current && current.name !== instance.name) {
@@ -366,15 +431,16 @@ export class RedisRegistryStore extends RegistryStore {
 
   async unregister(id: string) {
     await this.ensureReady();
-    const instance = await this.getInstance(id);
-    if (!instance) {
-      return false;
+    for (;;) {
+      const snapshot = (await this.client.hGet(this.keys.instances, id)) ?? null;
+      const instance = parseInstance(snapshot);
+      if (!instance) return false;
+      if (!(await this.rememberRemoval(id, snapshot, Date.now()))) continue;
+      await this.syncServiceIndex(instance, false);
+      await this.incrementMetric('unregisterCount');
+      await this.pushAudit(createAuditEvent('unregister', instance, '实例已下线'));
+      return true;
     }
-
-    await this.removeInstance(instance);
-    await this.incrementMetric('unregisterCount');
-    await this.pushAudit(createAuditEvent('unregister', instance, '实例已下线'));
-    return true;
   }
 
   async setAvailability(id: string, enabled: boolean) {
@@ -383,10 +449,14 @@ export class RedisRegistryStore extends RegistryStore {
       const snapshot = (await this.client.hGet(this.keys.instances, id)) ?? null;
       const instance = parseInstance(snapshot);
       if (!instance) return false;
-      if (Boolean(instance.disabled) !== enabled) return true;
-
+      const changed = Boolean(instance.disabled) === enabled;
       instance.disabled = enabled ? undefined : true;
+      instance.availabilityUpdatedAt = Math.max(
+        Date.now(),
+        (instance.availabilityUpdatedAt ?? 0) + 1,
+      );
       if (!(await this.writeLease(instance, snapshot))) continue;
+      if (!changed) return true;
       await this.syncServiceIndex(instance, enabled);
       await this.pushAudit(createAvailabilityAudit(instance, enabled));
       return true;
@@ -448,6 +518,16 @@ export class RedisRegistryStore extends RegistryStore {
     const cutoff = Date.now() - timeout;
 
     for (const snapshot of snapshots) {
+      if (snapshot.startsWith(REMOVED_PREFIX)) {
+        const removed = removedLease(snapshot);
+        if (Date.now() - removed.at > this.heartbeatTimeout) {
+          await this.client.eval(EXPIRE_REGISTRY_LEASE, {
+            keys: [this.keys.instances],
+            arguments: [removed.id, snapshot],
+          });
+        }
+        continue;
+      }
       const instance = parseInstance(snapshot);
       if (!instance || instance.lastHeartbeat >= cutoff) {
         continue;
@@ -532,9 +612,14 @@ export class RedisRegistryStore extends RegistryStore {
     );
   }
 
-  private async removeInstance(instance: ServiceInstance) {
-    await this.client.hDel(this.keys.instances, instance.id);
-    await this.syncServiceIndex(instance, false);
+  private async rememberRemoval(id: string, snapshot: string | null, at: number) {
+    if (snapshot?.startsWith(REMOVED_PREFIX) && removedLease(snapshot).at >= at) return true;
+    return (
+      (await this.client.eval(WRITE_REGISTRY_LEASE, {
+        keys: [this.keys.instances],
+        arguments: [id, snapshot ?? '', REMOVED_PREFIX + JSON.stringify({ id, at })],
+      })) === 1
+    );
   }
 
   /** 兼容仍读取服务集合的旧版中心。每次写后复查租约，纠正其间注册、改名或注销留下的索引。 */
@@ -692,8 +777,12 @@ function sortInstances(left: ServiceInstance, right: ServiceInstance) {
   return right.lastHeartbeat - left.lastHeartbeat;
 }
 
+function removedLease(snapshot: string): { id: string; at: number } {
+  return JSON.parse(snapshot.slice(REMOVED_PREFIX.length));
+}
+
 function parseInstance(raw: string | null) {
-  if (!raw) {
+  if (!raw || raw.startsWith(REMOVED_PREFIX)) {
     return null;
   }
 
