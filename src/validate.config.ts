@@ -7,6 +7,9 @@ import { SERVICE_MONITOR_DEFAULTS } from './constants/service-monitor.constants'
  * config-service 本身是注册中心，不向注册中心注册自身，故无 RegistryUrl 校验。
  */
 export class ConfigServiceConfig extends DatabaseConfig {
+  @IsString()
+  declare ControlPlaneToken?: string;
+
   @IsInt()
   @Min(SERVICE_MONITOR_DEFAULTS.minIntervalMs)
   @Max(SERVICE_MONITOR_DEFAULTS.maxIntervalMs)
