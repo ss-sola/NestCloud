@@ -23,7 +23,7 @@ Copy-Item .env.example .env
 pnpm start:dev
 ```
 
-示例配置使用端口 3001 和 API 前缀 `api`。控制台地址为 [http://localhost:3001/public/](http://localhost:3001/public/)，客户端将 `RegistryUrl` 设为 `http://localhost:3001`。部署时从仓库根目录执行以下命令，并将 `public/` 与 `dist/` 同级保留。
+示例配置使用端口 3001 和 API 前缀 `api`。控制台地址为 [http://localhost:3001/public/](http://localhost:3001/public/)，客户端将 `RegistryUrl` 设为 `["http://localhost:3001"]`。部署时从仓库根目录执行以下命令，并将 `public/` 与 `dist/` 同级保留。
 
 控制台的 TypeScript 源码位于 `console/`。`pnpm start:dev` 同时监听后端和控制台改动，修改控制台后刷新浏览器即可。`pnpm build:console` 编译浏览器模块到 `public/js/`，并将 pnpm 安装的 Bootstrap 和 Monaco 复制到 `public/vendor/`。完整构建也会执行这一步。部署时请复制构建后的整个 `public/` 目录。
 
