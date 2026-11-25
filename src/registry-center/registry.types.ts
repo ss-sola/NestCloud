@@ -5,7 +5,7 @@ export type { ServiceInstance };
 /** 租约时间由存储层在注册或续约时生成。 */
 export type RegistryRegistration = Omit<
   RegistryInstance,
-  'lastHeartbeat' | 'disabled' | 'heartbeatSuccessStreak'
+  'lastHeartbeat' | 'disabled' | 'heartbeatSuccessStreak' | 'availabilityUpdatedAt'
 >;
 
 export interface RegistryInstance extends ServiceInstance {
@@ -13,7 +13,20 @@ export interface RegistryInstance extends ServiceInstance {
   heartbeatSuccessStreak?: number;
   /** 控制台已暂停该实例参与服务发现，租约仍可续约。 */
   disabled?: true;
+  /** 最近一次流量开关变更的时间，用于多个中心回切时合并相反的操作。 */
+  availabilityUpdatedAt?: number;
 }
+
+export type RecoveryLease =
+  | { kind: 'remove'; instance: RegistryInstance; cutoff: number }
+  | {
+      kind: 'update';
+      instance: RegistryInstance;
+      registeredAt?: number;
+      availabilityChanged: boolean;
+    };
+
+export type MemoryLeaseChange = 'register' | 'heartbeat' | 'availability' | 'unregister' | 'expire';
 
 export type RegistryInstanceHealth = 'healthy' | 'warning' | 'critical';
 

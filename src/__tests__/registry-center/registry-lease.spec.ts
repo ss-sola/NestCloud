@@ -121,6 +121,42 @@ describe('Redis registry leases', () => {
     });
   });
 
+  it('多个中心恢复时合并心跳和流量开关，下线后忽略迟到的旧注册', async () => {
+    let row: string | null = null;
+    redis.hGet.mockImplementation(async () => row);
+    redis.hVals.mockImplementation(async () => (row ? [row] : []));
+    redis.eval.mockImplementation(async (_script, { arguments: args }) => {
+      if ((row ?? '') !== args[1]) return 0;
+      row = args[2];
+      return 1;
+    });
+    const renewed = { ...lease, lastHeartbeat: 60_000 };
+    const stopped = { ...lease, disabled: true as const, availabilityUpdatedAt: 40_000 };
+    await Promise.all([
+      store.reconcile({ kind: 'update', instance: renewed, availabilityChanged: false }),
+      store.reconcile({ kind: 'update', instance: stopped, availabilityChanged: true }),
+    ]);
+    expect(await store.getAllInstances()).toMatchObject([
+      { disabled: true, lastHeartbeat: 60_000 },
+    ]);
+    expect(await store.getService(lease.name)).toEqual([]);
+    await store.reconcile({ kind: 'remove', instance: lease, cutoff: 61_000 });
+    await store.reconcile({
+      kind: 'update',
+      instance: renewed,
+      registeredAt: 50_000,
+      availabilityChanged: false,
+    });
+    expect(await store.getAllInstances()).toEqual([]);
+    await store.reconcile({
+      kind: 'update',
+      instance: { ...lease, lastHeartbeat: 61_001 },
+      registeredAt: 61_001,
+      availabilityChanged: false,
+    });
+    expect(await store.getService(lease.name)).toMatchObject([{ id: lease.id }]);
+  });
+
   it('counts the winning cleanup once and preserves discovery and the index when the same ID re-registers', async () => {
     let row: string | null = observed;
     const members = new Set([lease.id]);

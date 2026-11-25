@@ -1,6 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { MemoryRegistryStore, RedisRegistryStore, type RegistryStore } from './registry.store';
-import type { RegistryRegistration, RegistryServiceQuery } from './registry.types';
+import type {
+  MemoryLeaseChange,
+  RecoveryLease,
+  RegistryInstance,
+  RegistryRegistration,
+  RegistryServiceQuery,
+} from './registry.types';
 import { REGISTRY_FALLBACK_SYNC_MS } from './registry.constants';
 
 export type RegistryBackend = Pick<
@@ -26,11 +32,15 @@ export class ResilientRegistryStore implements RegistryBackend {
   private revision = 0;
   private pendingSync?: Promise<void>;
   private retryAt = 0;
+  private readonly changes = new Map<string, RecoveryLease>();
 
   constructor(
     private readonly redis: RedisRegistryStore,
     private readonly memory: MemoryRegistryStore,
   ) {
+    memory.onLeaseChange = (kind, instance) => {
+      if (!this.useRedis) this.recordChange(kind, instance);
+    };
     this.timer = setInterval(() => void this.synchronize(), REGISTRY_FALLBACK_SYNC_MS).unref();
     void this.synchronize();
   }
@@ -102,6 +112,8 @@ export class ResilientRegistryStore implements RegistryBackend {
 
   async destroy() {
     clearInterval(this.timer);
+    await this.pendingSync;
+    this.memory.onLeaseChange = undefined;
     await Promise.all([this.redis.destroy(), this.memory.destroy()]);
   }
 
@@ -134,6 +146,39 @@ export class ResilientRegistryStore implements RegistryBackend {
     this.retryAt = Date.now() + REGISTRY_FALLBACK_SYNC_MS;
   }
 
+  private recordChange(kind: MemoryLeaseChange, instance: RegistryInstance): void {
+    const previous = this.changes.get(instance.id);
+    const copy = { ...instance };
+    if (kind === 'unregister' || kind === 'expire') {
+      const cutoff = kind === 'expire' ? instance.lastHeartbeat : Date.now();
+      this.changes.set(instance.id, { kind: 'remove', instance: copy, cutoff });
+    } else {
+      const prior = previous?.kind === 'update' ? previous : undefined;
+      const recreated = kind === 'register' && previous?.kind === 'remove';
+      let registeredAt = prior?.registeredAt;
+      if (kind === 'register') {
+        registeredAt = recreated
+          ? Math.max(instance.lastHeartbeat, previous.cutoff + 1)
+          : instance.lastHeartbeat;
+      }
+      // 下线后用相同 ID 新注册会开启新的流量状态，后续续约保留这次操作的顺序。
+      if (recreated) copy.availabilityUpdatedAt = registeredAt;
+      else if (prior?.availabilityChanged) {
+        const priorTime = prior.instance.availabilityUpdatedAt ?? 0;
+        copy.availabilityUpdatedAt = Math.max(
+          copy.availabilityUpdatedAt ?? 0,
+          priorTime + Number(prior.instance.disabled !== copy.disabled),
+        );
+      }
+      this.changes.set(instance.id, {
+        kind: 'update',
+        instance: copy,
+        registeredAt,
+        availabilityChanged: recreated || kind === 'availability' || !!prior?.availabilityChanged,
+      });
+    }
+  }
+
   private async synchronize(): Promise<void> {
     if (!this.redis.available) {
       if (this.useRedis) this.markDegraded();
@@ -149,9 +194,13 @@ export class ResilientRegistryStore implements RegistryBackend {
   private async refreshMirror(): Promise<void> {
     const revision = this.revision;
     try {
+      for (const [id, change] of this.changes) {
+        await this.redis.reconcile(change);
+        if (this.changes.get(id) === change) this.changes.delete(id);
+      }
       const shared = await this.redis.getAllInstances();
       // 同步期间的本地写入优先保留，下一轮再复制共享记录。
-      if (this.useRedis && revision !== this.revision) return;
+      if (revision !== this.revision || this.changes.size || !this.redis.available) return;
       this.memory.replaceInstances(shared);
       if (!this.useRedis) this.logger.log('注册中心已切换到共享 Redis');
       this.useRedis = true;
