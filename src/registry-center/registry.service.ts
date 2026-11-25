@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { getConfig, ProjectException } from '@nest-cloud/sdk';
-import { MemoryRegistryStore, RedisRegistryStore, RegistryStore } from './registry.store';
+import { MemoryRegistryStore, RedisRegistryStore } from './registry.store';
+import { ResilientRegistryStore, type RegistryBackend } from './resilient-registry.store';
 import { RegistryRegistration, RegistryServiceQuery } from './registry.types';
 import { CLEAR_TIMEOUT, DEFAULT_AUDIT_LIMIT, DEFAULT_REDIS_PREFIX } from './registry.constants';
 import { ConfigServiceKeys } from '../config-keys';
@@ -8,7 +9,7 @@ import { ConfigServiceKeys } from '../config-keys';
 @Injectable()
 export class RegistryService implements OnModuleDestroy {
   private readonly logger: Logger = new Logger(RegistryService.name);
-  private readonly store: RegistryStore;
+  private readonly store: RegistryBackend;
 
   constructor() {
     const redisUrl = getConfig<string>(ConfigServiceKeys.RegistryRedisUrl, '', false);
@@ -16,17 +17,22 @@ export class RegistryService implements OnModuleDestroy {
       getConfig<string>(ConfigServiceKeys.RegistryAuditLimit, String(DEFAULT_AUDIT_LIMIT), false),
     );
 
+    const memory = new MemoryRegistryStore({ auditLimit });
     this.store = redisUrl
-      ? new RedisRegistryStore({
-          redisUrl,
-          auditLimit,
-          keyPrefix: getConfig<string>(
-            ConfigServiceKeys.RegistryRedisKeyPrefix,
-            DEFAULT_REDIS_PREFIX,
-            false,
-          ),
-        })
-      : new MemoryRegistryStore({ auditLimit });
+      ? new ResilientRegistryStore(
+          new RedisRegistryStore({
+            redisUrl,
+            auditLimit,
+            failFast: true,
+            keyPrefix: getConfig<string>(
+              ConfigServiceKeys.RegistryRedisKeyPrefix,
+              DEFAULT_REDIS_PREFIX,
+              false,
+            ),
+          }),
+          memory,
+        )
+      : memory;
   }
 
   async onModuleDestroy() {
@@ -71,6 +77,10 @@ export class RegistryService implements OnModuleDestroy {
 
   getAll() {
     return this.store.getAll();
+  }
+
+  getInstancesForMonitoring() {
+    return this.store.getAllInstances();
   }
 
   getOverview() {

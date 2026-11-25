@@ -6,6 +6,7 @@ import {
   CLEAR_TIMEOUT,
   DEFAULT_AUDIT_LIMIT,
   DEFAULT_REDIS_PREFIX,
+  REGISTRY_REDIS_RESILIENCE_OPTIONS,
 } from './registry.constants';
 import {
   RegistryAuditEvent,
@@ -30,6 +31,8 @@ type RegistryStoreOptions = {
 type RedisRegistryStoreOptions = RegistryStoreOptions & {
   redisUrl: string;
   keyPrefix?: string;
+  /** 降级模式下断线立即交回调用方，避免命令在离线队列中重复执行。 */
+  failFast?: boolean;
 };
 
 const logger = new Logger('RegistryStore');
@@ -139,12 +142,24 @@ export class MemoryRegistryStore extends RegistryStore {
   private readonly auditLogs: RegistryAuditEvent[] = [];
   private readonly metrics = EMPTY_METRICS();
 
+  replaceInstances(instances: RegistryInstance[]): void {
+    this.cacheMap.clear();
+    this.serviceMap.clear();
+    for (const instance of instances) this.rememberInstance(instance);
+  }
+
+  rememberInstance(instance: RegistryInstance): void {
+    const previous = this.cacheMap.get(instance.id);
+    if (previous) this.removeInstance(previous);
+    const copy = { ...instance };
+    this.cacheMap.set(copy.id, copy);
+    const serviceInstances = this.serviceMap.get(copy.name) ?? new Map<string, RegistryInstance>();
+    serviceInstances.set(copy.id, copy);
+    this.serviceMap.set(copy.name, serviceInstances);
+  }
+
   register(instance: RegistryRegistration): Promise<RegistryInstance> {
     const current = this.cacheMap.get(instance.id);
-    if (current && current.name !== instance.name) {
-      this.removeFromServiceMap(current);
-    }
-
     const nextInstance = {
       ...instance,
       lastHeartbeat: Date.now(),
@@ -152,11 +167,7 @@ export class MemoryRegistryStore extends RegistryStore {
       disabled: current?.disabled,
     };
 
-    this.cacheMap.set(nextInstance.id, nextInstance);
-    const serviceInstances =
-      this.serviceMap.get(nextInstance.name) ?? new Map<string, RegistryInstance>();
-    serviceInstances.set(nextInstance.id, nextInstance);
-    this.serviceMap.set(nextInstance.name, serviceInstances);
+    this.rememberInstance(nextInstance);
     this.incrementMetric('registerCount');
     this.pushAudit(createAuditEvent('register', nextInstance, '实例已注册或更新'));
 
@@ -293,6 +304,7 @@ export class RedisRegistryStore extends RegistryStore {
   readonly storageType: RegistryStorageType = 'redis';
   private readonly client: RedisClientType;
   private readonly ready: Promise<RedisClientType>;
+  private readonly failFast: boolean;
   private readonly keys: {
     instances: string;
     metrics: string;
@@ -302,6 +314,7 @@ export class RedisRegistryStore extends RegistryStore {
 
   constructor(options: RedisRegistryStoreOptions) {
     super(options);
+    this.failFast = options.failFast ?? false;
     const prefix = options.keyPrefix || DEFAULT_REDIS_PREFIX;
 
     this.keys = {
@@ -311,7 +324,10 @@ export class RedisRegistryStore extends RegistryStore {
       service: (serviceName: string) => `${prefix}:service:${serviceName}`,
     };
 
-    this.client = createClient({ url: options.redisUrl });
+    this.client = createClient({
+      url: options.redisUrl,
+      ...(this.failFast ? REGISTRY_REDIS_RESILIENCE_OPTIONS : {}),
+    });
     this.client.on('error', (error) => {
       logger.error(
         `[RedisRegistryStore] redis error: ${error instanceof Error ? error.message : String(error)}`,
@@ -319,6 +335,11 @@ export class RedisRegistryStore extends RegistryStore {
       );
     });
     this.ready = this.client.connect();
+    if (this.failFast) void this.ready.catch(() => undefined);
+  }
+
+  get available(): boolean {
+    return this.client.isReady;
   }
 
   async register(instance: RegistryRegistration) {
@@ -479,6 +500,10 @@ export class RedisRegistryStore extends RegistryStore {
 
   async destroy() {
     this.stopCleanupTask();
+    if (this.failFast) {
+      if (this.client.isOpen) this.client.destroy();
+      return;
+    }
     await this.ensureReady();
     if (this.client.isOpen) {
       await this.client.quit();
@@ -486,6 +511,10 @@ export class RedisRegistryStore extends RegistryStore {
   }
 
   private async ensureReady() {
+    if (this.failFast) {
+      if (!this.available) throw new Error('注册中心 Redis 尚未就绪');
+      return;
+    }
     await this.ready;
   }
 

@@ -1,5 +1,6 @@
 import { initConfigUI } from './config/main.js';
 import { initRegistryUI } from './registry/main.js';
+import { initServiceMonitorUI } from './registry/service-monitor.js';
 
 type MenuAction = () => Promise<void | (() => void)>;
 let activeMenu: Element | null = null;
@@ -55,12 +56,14 @@ async function activateMenu(item: Element, action: MenuAction) {
 document.addEventListener('DOMContentLoaded', async () => {
   const configMenu = document.querySelector('#configMenu');
   const serverMenu = document.querySelector('#serverMenu');
+  const monitorMenu = document.querySelector('#monitorMenu');
   bindSidebarState();
 
-  if (!configMenu || !serverMenu) return;
+  if (!configMenu || !serverMenu || !monitorMenu) return;
   const menuActions = new Map<Element, MenuAction>([
     [configMenu, initConfigUI],
     [serverMenu, initRegistryUI],
+    [monitorMenu, initServiceMonitorUI],
   ]);
 
   menuActions.forEach((action, item) => {
