@@ -9,4 +9,7 @@ export const ConfigServiceKeys = {
   RegistryAuditLimit: 'RegistryAuditLimit',
   /** 注册中心数据在 Redis 中的键前缀 */
   RegistryRedisKeyPrefix: 'RegistryRedisKeyPrefix',
+  ServiceMonitorIntervalMs: 'ServiceMonitorIntervalMs',
+  ServiceMonitorTrustedHosts: 'ServiceMonitorTrustedHosts',
+  ServiceMonitorStaticTargets: 'ServiceMonitorStaticTargets',
 } as const;

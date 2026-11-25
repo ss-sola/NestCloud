@@ -10,6 +10,204 @@
   --header-height: 60px;
 }
 
+/* 服务监控 */
+.service-monitor {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.monitor-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 125px), 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.monitor-summary > div {
+  padding: 12px 15px;
+  background: #f5f8fc;
+  border: 1px solid #e0e8f2;
+  border-radius: 10px;
+}
+
+.monitor-summary dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.monitor-summary dd {
+  margin: 4px 0 0;
+  color: #1e3a5f;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-summary > .monitor-summary-ok {
+  background: #eef9f4;
+  border-color: #d5eee1;
+}
+
+.monitor-summary-ok dd {
+  color: #166548;
+}
+
+.monitor-summary > .monitor-summary-high {
+  background: #fff8ed;
+  border-color: #f5e6ce;
+}
+
+.monitor-summary-high dd {
+  color: #924b12;
+}
+
+.monitor-summary-high[data-active='true'] {
+  background: #fdeeee;
+  border-color: #f4d5d7;
+}
+
+.monitor-summary-high[data-active='true'] dd,
+.monitor-table .monitor-high-usage .monitor-service-name,
+.monitor-table .monitor-high-usage-metric {
+  color: #a22934;
+}
+
+.monitor-summary-high small {
+  display: block;
+  margin-top: 4px;
+  color: #526275;
+  font-size: 0.72rem;
+}
+
+.monitor-table-wrap {
+  border: 1px solid #dfe7f0;
+  border-radius: 10px;
+}
+
+.monitor-table {
+  min-width: 1100px;
+  color: #27364a;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-table.table > :not(caption) > * > * {
+  padding: 10px;
+  border-color: #e7edf4;
+}
+
+.monitor-table thead th {
+  --bs-table-bg: #eef3f9;
+  background-color: var(--bs-table-bg);
+  color: #334155;
+}
+
+.monitor-table thead button {
+  color: inherit;
+}
+
+.monitor-table thead [aria-sort] {
+  color: #174f95;
+  --bs-table-bg: #e1edfc;
+}
+
+.monitor-table tbody tr:nth-child(even) {
+  --bs-table-bg: #f8fafd;
+}
+
+.monitor-table tbody tr.monitor-high-usage {
+  --bs-table-bg: #fff4f4;
+}
+
+.monitor-table :is(th, td):first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.monitor-table td {
+  white-space: nowrap;
+}
+
+.monitor-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.monitor-service-name {
+  font-weight: 650;
+}
+
+.monitor-table .monitor-instance-address {
+  color: #526275;
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+.monitor-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf1f5;
+  color: #435367;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.monitor-status::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.monitor-status-available {
+  background: #e4f6ec;
+  color: #176448;
+}
+
+.monitor-usage-label {
+  display: block;
+  margin-top: 3px;
+  color: #a22934;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.monitor-status-failed {
+  background: #fdeaea;
+  color: #a22934;
+}
+
+.monitor-status-stale,
+.monitor-status-excluded {
+  background: #fff0d7;
+  color: #864600;
+}
+
+.monitor-meter {
+  --monitor-meter-fill: #3979c3;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 56px;
+  height: 4px;
+  margin-top: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: #e2e9f2;
+}
+
+.monitor-meter-memory { --monitor-meter-fill: #7861b2; }
+.monitor-meter-disk { --monitor-meter-fill: #218278; }
+.monitor-high-usage-metric .monitor-meter { --monitor-meter-fill: #bf3f4b; }
+.monitor-meter::-webkit-progress-bar { background: #e2e9f2; border-radius: inherit; }
+.monitor-meter::-webkit-progress-value { background: var(--monitor-meter-fill); border-radius: inherit; }
+.monitor-meter::-moz-progress-bar { background: var(--monitor-meter-fill); border-radius: inherit; }
+
 /* 基础样式 */
 * {
   margin: 0;

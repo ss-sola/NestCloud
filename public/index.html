@@ -30,6 +30,10 @@
             <i>📊</i>
             <span>注册中心</span>
           </div>
+          <div class="menu-item" id="monitorMenu">
+            <i>📈</i>
+            <span>服务监控</span>
+          </div>
           <div class="menu-item" id="configMenu">
             <i>⚙️</i>
             <span>配置管理</span>
@@ -40,6 +44,70 @@
 
     <!-- 主内容区 -->
     <div class="main-content"></div>
+    <template id="serviceMonitorTemplate">
+      <section class="card border-0 shadow-sm service-monitor">
+        <div class="card-body">
+          <header class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h1 class="h4 mb-1">服务监控</h1>
+                <p class="text-secondary mb-0">进程 CPU 以单个逻辑核满载为 100%</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-monitor-refresh>刷新</button>
+          </header>
+          <p class="text-secondary small" role="status" data-monitor-status></p>
+          <dl class="monitor-summary" aria-label="监控概览">
+            <div><dt>服务数</dt><dd data-monitor-services>—</dd></div>
+            <div><dt>实例数</dt><dd data-monitor-instances>—</dd></div>
+            <div class="monitor-summary-ok"><dt>采集正常</dt><dd data-monitor-available>—</dd></div>
+            <div class="monitor-summary-high"><dt>持续高占用</dt><dd data-monitor-high-usage>—</dd><small data-monitor-high-usage-policy></small></div>
+          </dl>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+              <label class="form-label mb-0">
+                服务
+                <select class="form-select form-select-sm" data-monitor-service>
+                  <option value="">全部服务</option>
+                </select>
+              </label>
+              <label class="form-label mb-0">
+                每页实例
+                <select class="form-select form-select-sm" data-monitor-page-size>
+                  <option value="5">5</option>
+                  <option value="10" selected>10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </label>
+            </div>
+          <div class="table-responsive monitor-table-wrap">
+            <table class="table table-hover align-middle mb-0 monitor-table">
+              <thead>
+                <tr>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="name">服务</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="address">实例地址</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="status">采集状态</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="cpu">进程 CPU</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="cores">逻辑核心</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="systemMemory">系统内存占用</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="diskTotal">磁盘总量</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="diskUsed">磁盘已用</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="rss">进程内存（RSS）</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="heap">堆内存 已用 / 分配</button></th>
+                    <th scope="col"><button type="button" class="btn btn-sm text-nowrap px-0 fw-semibold" data-monitor-sort="time">采集时间</button></th>
+                </tr>
+              </thead>
+              <tbody data-monitor-body></tbody>
+            </table>
+          </div>
+            <nav class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3" aria-label="服务实例分页">
+              <span class="small text-secondary" data-monitor-pagination role="status"></span>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" type="button" data-monitor-prev disabled>上一页</button>
+                <button class="btn btn-outline-secondary" type="button" data-monitor-next disabled>下一页</button>
+              </div>
+            </nav>
+        </div>
+      </section>
+    </template>
     <!-- 加载动画 -->
     <div class="loading-overlay" id="loadingOverlay">
       <div class="spinner"></div>
