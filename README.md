@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 
 启用控制面鉴权时，在 NestCloud 和接入服务的 `.env` 或进程环境中设置相同的 `ControlPlaneToken`。控制台每个浏览器会话输入一次 Token，刷新页面可继续使用当前会话。[部署和接入说明](docs/project/部署与可观测性.md#控制面鉴权)
 
-本仓库的 `sql/sdk/` 维护 SDK 所需表的建表脚本。启用写请求幂等前，在每个接收写请求的业务数据库执行[幂等记录建表脚本](sql/sdk/add-rpc-idempotency-record.sql)。多个服务共用一个数据库和 schema 时只需执行一次，已有库可重复执行。
+本仓库的 `sql/sdk/` 维护 SDK 所需表的建表脚本。启用写请求幂等前，在每个接收写请求的业务数据库执行对应脚本。可选 [PostgreSQL](sql/sdk/add-rpc-idempotency-record.sql) 或 [MySQL InnoDB](sql/sdk/add-rpc-idempotency-record.mysql.sql)。多个服务共用同一幂等表时只需执行一次，已有库可重复执行。
 
 ```powershell
 pnpm start:dev
